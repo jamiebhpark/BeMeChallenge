@@ -1,9 +1,9 @@
-// PhotoPreviewView.swift
+//PhotoPreviewView.swift
 import SwiftUI
 
 struct PhotoPreviewView: View {
     @ObservedObject var cameraVM: CameraViewModel
-    var challengeId: String // 업로드할 챌린지 ID
+    var challengeId: String
     
     @State private var isUploading: Bool = false
     @State private var uploadError: String?
@@ -22,7 +22,6 @@ struct PhotoPreviewView: View {
             
             HStack(spacing: 16) {
                 Button(action: {
-                    // 다시 찍기: capturedImage 초기화 → 카메라 화면으로 복귀
                     cameraVM.capturedImage = nil
                 }) {
                     Text("다시 찍기")
@@ -39,7 +38,6 @@ struct PhotoPreviewView: View {
                             isUploading = false
                             switch result {
                             case .success:
-                                // 업로드 성공 후 상태 초기화 또는 성공 메시지 표시
                                 cameraVM.capturedImage = nil
                             case .failure(let error):
                                 uploadError = error.localizedDescription
@@ -63,15 +61,16 @@ struct PhotoPreviewView: View {
             .padding()
         }
         .padding()
-        .alert(item: $uploadError) { error in
-            Alert(title: Text("업로드 오류"), message: Text(error), dismissButton: .default(Text("확인")))
+        .navigationTitle("사진 업로드")
+        .alert(isPresented: Binding<Bool>(
+            get: { uploadError != nil },
+            set: { newValue in if !newValue { uploadError = nil } }
+        )) {
+            Alert(title: Text("업로드 오류"),
+                  message: Text(uploadError ?? ""),
+                  dismissButton: .default(Text("확인")))
         }
     }
-}
-
-// String을 Identifiable로 확장(Alert용)
-extension String: Identifiable {
-    public var id: String { self }
 }
 
 struct PhotoPreviewView_Previews: PreviewProvider {

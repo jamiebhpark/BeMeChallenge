@@ -9,11 +9,6 @@ struct MainTabView: View {
                     Image(systemName: "house.fill")
                     Text("홈")
                 }
-            CameraView()
-                .tabItem {
-                    Image(systemName: "plus.app.fill")
-                    Text("촬영")
-                }
             ProfileView()
                 .tabItem {
                     Image(systemName: "person.crop.circle")

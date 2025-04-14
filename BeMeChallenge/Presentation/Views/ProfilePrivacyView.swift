@@ -1,4 +1,3 @@
-// ProfilePrivacyView.swift
 import SwiftUI
 
 struct ProfilePrivacyView: View {
@@ -29,15 +28,16 @@ struct ProfilePrivacyView: View {
             .onAppear {
                 viewModel.fetchPrivacySetting()
             }
-            .alert(item: Binding.constant(viewModel.errorMessage)) { error in
-                Alert(title: Text("오류"), message: Text(error), dismissButton: .default(Text("확인")))
+            .alert(isPresented: Binding<Bool>(
+                get: { viewModel.errorMessage != nil },
+                set: { newValue in if !newValue { viewModel.errorMessage = nil } }
+            )) {
+                Alert(title: Text("오류"),
+                      message: Text(viewModel.errorMessage ?? ""),
+                      dismissButton: .default(Text("확인")))
             }
         }
     }
-}
-
-extension String: Identifiable {
-    public var id: String { self }
 }
 
 struct ProfilePrivacyView_Previews: PreviewProvider {

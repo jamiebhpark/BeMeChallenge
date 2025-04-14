@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7D4D59D92DACA946005017E1 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7D4D59D82DACA946005017E1 /* GoogleService-Info.plist */; };
 		7DA9AE9A2DA7B55300B608F0 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 7DA9AE992DA7B55300B608F0 /* FirebaseAuth */; };
 		7DA9AE9C2DA7B55300B608F0 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 7DA9AE9B2DA7B55300B608F0 /* FirebaseFirestore */; };
 		7DA9AE9E2DA7B55300B608F0 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 7DA9AE9D2DA7B55300B608F0 /* FirebaseStorage */; };
@@ -19,12 +20,26 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		7D4D59D82DACA946005017E1 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		7DA9AE5D2DA7B1F700B608F0 /* BeMeChallenge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BeMeChallenge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		7D4D59DB2DACD12D005017E1 /* Exceptions for "BeMeChallenge" folder in "BeMeChallenge" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 7DA9AE5C2DA7B1F700B608F0 /* BeMeChallenge */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		7DA9AE5F2DA7B1F700B608F0 /* BeMeChallenge */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				7D4D59DB2DACD12D005017E1 /* Exceptions for "BeMeChallenge" folder in "BeMeChallenge" target */,
+			);
 			path = BeMeChallenge;
 			sourceTree = "<group>";
 		};
@@ -55,6 +70,7 @@
 			children = (
 				7DA9AE5F2DA7B1F700B608F0 /* BeMeChallenge */,
 				7DA9AE5E2DA7B1F700B608F0 /* Products */,
+				7D4D59D82DACA946005017E1 /* GoogleService-Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -143,6 +159,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7D4D59D92DACA946005017E1 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -285,11 +302,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BeMeChallenge/BeMeChallenge.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 54THW6C299;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BeMeChallenge/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "BeMe Challenge에서 사진 촬영을 위해 카메라 접근이 필요합니다.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "BeMe Challenge에서 사진 선택을 위해 사진 라이브러리 접근이 필요합니다.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -318,11 +339,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BeMeChallenge/BeMeChallenge.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 54THW6C299;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BeMeChallenge/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "BeMe Challenge에서 사진 촬영을 위해 카메라 접근이 필요합니다.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "BeMe Challenge에서 사진 선택을 위해 사진 라이브러리 접근이 필요합니다.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

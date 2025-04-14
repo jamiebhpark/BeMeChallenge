@@ -1,4 +1,3 @@
-// ProfilePictureUpdateView.swift
 import SwiftUI
 
 struct ProfilePictureUpdateView: View {
@@ -60,15 +59,15 @@ struct ProfilePictureUpdateView: View {
         .sheet(isPresented: $isPickerPresented) {
             ImagePicker(selectedImage: $selectedImage)
         }
-        .alert(item: $uploadError) { error in
-            Alert(title: Text("업로드 오류"), message: Text(error), dismissButton: .default(Text("확인")))
+        .alert(isPresented: Binding<Bool>(
+            get: { uploadError != nil },
+            set: { newValue in if !newValue { uploadError = nil } }
+        )) {
+            Alert(title: Text("업로드 오류"),
+                  message: Text(uploadError ?? ""),
+                  dismissButton: .default(Text("확인")))
         }
     }
-}
-
-// String을 Identifiable로 확장 (Alert용)
-extension String: Identifiable {
-    public var id: String { self }
 }
 
 struct ProfilePictureUpdateView_Previews: PreviewProvider {

@@ -1,7 +1,8 @@
-// AuthViewModel.swift
+//AuthViewModel.swift
 import SwiftUI
 import FirebaseAuth
 import Combine
+import AuthenticationServices
 
 class AuthViewModel: ObservableObject {
     @Published var isLoggedIn: Bool = false

@@ -1,4 +1,4 @@
-// ContentView.swift
+//ContentView.swift
 import SwiftUI
 
 struct ContentView: View {
@@ -7,9 +7,9 @@ struct ContentView: View {
     var body: some View {
         Group {
             if authViewModel.isLoggedIn {
-                MainTabView() // 메인 탭(홈, 촬영, 프로필)
+                MainTabView() // 메인 탭 (홈, 촬영, 프로필)
             } else {
-                LoginView()   // 소셜 로그인 화면
+                LoginView(authViewModel: authViewModel) // 공유된 authViewModel 전달
             }
         }
         .onAppear {

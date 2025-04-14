@@ -1,4 +1,4 @@
-// CameraViewModel.swift (업데이트)
+//CameraViewModel.swift
 import Foundation
 import Combine
 import AVFoundation
@@ -7,7 +7,7 @@ import FirebaseFirestore
 import FirebaseAuth
 import SwiftUI
 
-class CameraViewModel: ObservableObject {
+class CameraViewModel: NSObject, ObservableObject {
     @Published var capturedImage: UIImage? = nil
     let session = AVCaptureSession()
     private var photoOutput = AVCapturePhotoOutput()
@@ -35,7 +35,6 @@ class CameraViewModel: ObservableObject {
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
     
-    // 업로드 함수 업데이트: 업로드 시작 시간 측정 및 이벤트 로깅
     func uploadPhoto(_ image: UIImage, forChallenge challengeId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         let startTime = Date()
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
@@ -60,8 +59,8 @@ class CameraViewModel: ObservableObject {
                     completion(.failure(NSError(domain: "Upload", code: -1, userInfo: [NSLocalizedDescriptionKey: "Download URL is nil."])))
                     return
                 }
-                let uploadTime = Date().timeIntervalSince(startTime) * 1000 // 밀리초 단위
-                AnalyticsManager.shared.logPhotoUpload(challengeId: challengeId, uploadTime: uploadTime)
+                let uploadTime = Date().timeIntervalSince(startTime) * 1000
+                // 이벤트 로깅 등 추가
                 self.savePost(forChallenge: challengeId, imageUrl: downloadURL, completion: completion)
             }
         }
@@ -102,6 +101,7 @@ extension CameraViewModel: AVCapturePhotoCaptureDelegate {
             print("Error converting photo data.")
             return
         }
+        print("Photo captured successfully.")
         DispatchQueue.main.async {
             self.capturedImage = image
         }

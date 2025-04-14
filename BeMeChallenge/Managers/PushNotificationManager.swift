@@ -3,6 +3,7 @@ import Foundation
 import UserNotifications
 import FirebaseMessaging
 import FirebaseAuth
+import FirebaseFirestore
 import UIKit
 
 class PushNotificationManager: NSObject, ObservableObject {

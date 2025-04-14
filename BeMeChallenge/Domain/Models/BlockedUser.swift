@@ -1,6 +1,6 @@
 // Domain/Models/BlockedUser.swift
 import Foundation
-import FirebaseFirestoreSwift
+import FirebaseFirestore
 
 struct BlockedUser: Identifiable, Codable {
     @DocumentID var id: String?

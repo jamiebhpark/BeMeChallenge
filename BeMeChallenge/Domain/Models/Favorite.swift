@@ -1,6 +1,6 @@
 // Domain/Models/Favorite.swift
 import Foundation
-import FirebaseFirestoreSwift
+import FirebaseFirestore
 
 struct Favorite: Identifiable, Codable {
     @DocumentID var id: String?

@@ -38,13 +38,19 @@ class BadgeService {
         badgeToAward.earnedDate = Date()
         
         let badgeDocID = badge.id ?? UUID().uuidString
-        db.collection("users").document(userId).collection("badges").document(badgeDocID)
-            .setData(from: badgeToAward) { error in
-                if let error = error {
-                    completion(.failure(error))
-                } else {
-                    completion(.success(()))
+        
+        // 인코딩 과정에서 오류가 발생할 수 있으므로 do-catch로 처리합니다.
+        do {
+            try db.collection("users").document(userId).collection("badges").document(badgeDocID)
+                .setData(from: badgeToAward) { error in
+                    if let error = error {
+                        completion(.failure(error))
+                    } else {
+                        completion(.success(()))
+                    }
                 }
-            }
+        } catch {
+            completion(.failure(error))
+        }
     }
 }

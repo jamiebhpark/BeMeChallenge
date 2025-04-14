@@ -1,6 +1,6 @@
 // Domain/Models/ChallengeReview.swift
 import Foundation
-import FirebaseFirestoreSwift
+import FirebaseFirestore
 
 struct ChallengeReview: Identifiable, Codable {
     @DocumentID var id: String?

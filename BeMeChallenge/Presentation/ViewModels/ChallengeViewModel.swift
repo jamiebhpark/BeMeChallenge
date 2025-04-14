@@ -26,19 +26,24 @@ class ChallengeViewModel: ObservableObject {
                     print("Error fetching challenges: \(error.localizedDescription)")
                     return
                 }
-                guard let documents = snapshot?.documents else { return }
+                guard let documents = snapshot?.documents else {
+                    print("No documents found")
+                    return
+                }
+                print("Documents count: \(documents.count)")
                 self.challenges = documents.compactMap { doc in
                     let data = doc.data()
+                    print("Document data: \(data)")
                     guard let title = data["title"] as? String,
                           let description = data["description"] as? String,
                           let participantsCount = data["participantsCount"] as? Int,
-                          let endTimestamp = data["endDate"] as? Timestamp
-                    else { return nil }
+                          let endTimestamp = data["endDate"] as? Timestamp else { return nil }
                     let endDate = endTimestamp.dateValue()
                     return Challenge(id: doc.documentID, title: title, description: description, participantsCount: participantsCount, endDate: endDate)
                 }
             }
     }
+
     
     // 챌린지 참여 시 참여자 수 업데이트 예제
     func joinChallenge(challengeId: String, completion: @escaping (Result<Void, Error>) -> Void) {

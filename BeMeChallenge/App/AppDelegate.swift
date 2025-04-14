@@ -1,7 +1,8 @@
-// AppDelegate.swift (동적 링크 처리 추가)
+// AppDelegate.swift
 import UIKit
 import Firebase
 import FirebaseDynamicLinks
+import FirebaseMessaging   // 이 줄 추가
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
@@ -15,7 +16,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         Messaging.messaging().apnsToken = deviceToken
     }
     
-    // 동적 링크 처리: Universal Link를 통한 앱 실행
     func application(_ application: UIApplication,
                      continue userActivity: NSUserActivity,
                      restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
@@ -27,10 +27,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                     return
                 }
                 if let challengeId = DynamicLinksManager.shared.handleDynamicLink(dynamicLink) {
-                    // 챌린지 ID를 추출하여 해당 챌린지 상세 화면으로 내비게이션 처리
+                    // 추출된 챌린지 ID를 사용해 관련 화면으로 이동 (앱 내비게이션 처리)
                     print("동적 링크로 전달된 챌린지 ID: \(challengeId)")
-                    // 예를 들어, RootViewModel이나 Coordinator를 통해 ChallengeDetailView로 전환
-                    // 이 부분은 앱의 내비게이션 구조에 맞게 구현합니다.
                 }
             }
             return handled

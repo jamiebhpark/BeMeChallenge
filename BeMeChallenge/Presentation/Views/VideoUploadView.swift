@@ -8,7 +8,7 @@ struct VideoUploadView: View {
     @State private var isUploading = false
     @State private var uploadError: String?
     @Environment(\.presentationMode) var presentationMode
-    
+
     var body: some View {
         VStack {
             if let videoURL = videoURL {
@@ -59,14 +59,13 @@ struct VideoUploadView: View {
             .padding()
         }
         .navigationTitle("비디오 업로드")
-        .alert(item: $uploadError) { error in
-            Alert(title: Text("업로드 오류"), message: Text(error), dismissButton: .default(Text("확인")))
+        .alert(isPresented: Binding<Bool>(
+            get: { uploadError != nil },
+            set: { newValue in if !newValue { uploadError = nil } }
+        )) {
+            Alert(title: Text("업로드 오류"), message: Text(uploadError ?? ""), dismissButton: .default(Text("확인")))
         }
     }
-}
-
-extension String: Identifiable {
-    public var id: String { self }
 }
 
 struct VideoUploadView_Previews: PreviewProvider {

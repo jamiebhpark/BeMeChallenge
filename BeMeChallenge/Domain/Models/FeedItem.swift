@@ -1,6 +1,6 @@
 // Domain/Models/FeedItem.swift
 import Foundation
-import FirebaseFirestoreSwift
+import FirebaseFirestore
 
 struct FeedItem: Identifiable, Codable {
     @DocumentID var id: String?

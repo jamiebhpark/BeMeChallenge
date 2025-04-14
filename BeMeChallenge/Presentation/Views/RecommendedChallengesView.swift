@@ -3,12 +3,19 @@ import SwiftUI
 
 struct RecommendedChallengesView: View {
     @StateObject var viewModel = RecommendationViewModel()
-    
+    @StateObject var challengeVM = ChallengeViewModel()  // 공유 인스턴스
+        
     var body: some View {
         NavigationView {
-            List(viewModel.recommendedChallenges) { challenge in
-                NavigationLink(destination: ChallengeDetailView(challengeId: challenge.id)) {
-                    ChallengeCardView(challenge: challenge)
+            List {
+                ForEach(viewModel.recommendedChallenges) { challenge in
+                    NavigationLink(
+                        destination: ChallengeDetailView(
+                            challengeId: challenge.id,
+                        )
+                    ) {
+                        ChallengeCardView(challenge: challenge, viewModel: challengeVM)
+                    }
                 }
             }
             .listStyle(PlainListStyle())
@@ -25,3 +32,4 @@ struct RecommendedChallengesView_Previews: PreviewProvider {
         RecommendedChallengesView()
     }
 }
+

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ChallengeCardView: View {
     var challenge: Challenge
+    @ObservedObject var viewModel: ChallengeViewModel
     
     var body: some View {
         NavigationLink(destination: ChallengeDetailView(challengeId: challenge.id)) {
@@ -18,13 +19,15 @@ struct ChallengeCardView: View {
                 }
                 .font(.caption)
                 Button(action: {
-                    // 챌린지 참여 로직 구현
+                    // 참여하기 버튼 액션 (이전에는 별도의 내비게이션 로직 없이 UI만 존재)
                 }) {
                     Text("참여하기")
                         .fontWeight(.bold)
                         .padding()
                         .frame(maxWidth: .infinity)
-                        .background(LinearGradient(gradient: Gradient(colors: [Color("Lavender"), Color("SkyBlue")]), startPoint: .leading, endPoint: .trailing))
+                        .background(LinearGradient(gradient: Gradient(colors: [Color("Lavender"), Color("SkyBlue")]),
+                                                   startPoint: .leading,
+                                                   endPoint: .trailing))
                         .foregroundColor(.white)
                         .cornerRadius(10)
                 }
@@ -51,7 +54,8 @@ struct ChallengeCardView_Previews: PreviewProvider {
                                                title: "오늘의 출근룩",
                                                description: "자연스러운 출근 복장 공유",
                                                participantsCount: 120,
-                                               endDate: Date()))
+                                               endDate: Date()),
+                           viewModel: ChallengeViewModel())
             .previewLayout(.sizeThatFits)
     }
 }

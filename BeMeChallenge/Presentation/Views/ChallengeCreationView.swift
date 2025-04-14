@@ -1,4 +1,3 @@
-// ChallengeCreationView.swift
 import SwiftUI
 
 struct ChallengeCreationView: View {
@@ -31,8 +30,13 @@ struct ChallengeCreationView: View {
                 }
             }
             .navigationTitle("챌린지 생성")
-            .alert(item: $viewModel.errorMessage) { errorMsg in
-                Alert(title: Text("에러"), message: Text(errorMsg), dismissButton: .default(Text("확인")))
+            .alert(isPresented: Binding<Bool>(
+                get: { viewModel.errorMessage != nil },
+                set: { newValue in if !newValue { viewModel.errorMessage = nil } }
+            )) {
+                Alert(title: Text("에러"),
+                      message: Text(viewModel.errorMessage ?? ""),
+                      dismissButton: .default(Text("확인")))
             }
         }
     }

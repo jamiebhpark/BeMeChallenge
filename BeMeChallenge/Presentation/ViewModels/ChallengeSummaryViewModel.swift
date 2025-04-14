@@ -1,7 +1,6 @@
 // ChallengeSummaryViewModel.swift
 import Foundation
 import FirebaseFirestore
-import FirebaseFirestoreSwift
 import Combine
 
 struct ChallengeSummary {

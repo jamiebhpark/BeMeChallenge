@@ -1,6 +1,6 @@
 // Domain/Models/DirectMessage.swift
 import Foundation
-import FirebaseFirestoreSwift
+import FirebaseFirestore
 
 struct DirectMessage: Identifiable, Codable {
     @DocumentID var id: String?

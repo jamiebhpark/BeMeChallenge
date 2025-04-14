@@ -1,5 +1,6 @@
 // Presentation/Views/ChatView.swift
 import SwiftUI
+import FirebaseAuth
 
 struct ChatView: View {
     @StateObject var viewModel: ChatViewModel

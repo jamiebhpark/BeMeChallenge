@@ -1,6 +1,8 @@
 // HomeView.swift
 import SwiftUI
 
+import SwiftUI
+
 struct HomeView: View {
     @StateObject var challengeVM = ChallengeViewModel()
     
@@ -9,7 +11,9 @@ struct HomeView: View {
             ScrollView {
                 LazyVStack(spacing: 16) {
                     ForEach(challengeVM.challenges) { challenge in
-                        ChallengeCardView(challenge: challenge)
+                        NavigationLink(destination: ChallengeDetailView(challengeId: challenge.id)) {
+                            ChallengeCardView(challenge: challenge, viewModel: challengeVM)
+                        }
                     }
                 }
                 .padding()
@@ -27,3 +31,4 @@ struct HomeView_Previews: PreviewProvider {
         HomeView()
     }
 }
+
