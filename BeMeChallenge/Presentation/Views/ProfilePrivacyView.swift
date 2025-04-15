@@ -1,8 +1,8 @@
+//ProfilePrivacyView.swift
 import SwiftUI
 
 struct ProfilePrivacyView: View {
     @StateObject var viewModel = ProfilePrivacyViewModel()
-    @State private var isUpdating = false
     
     var body: some View {
         NavigationView {
@@ -10,17 +10,26 @@ struct ProfilePrivacyView: View {
                 Section(header: Text("프로필 공개 설정")) {
                     Toggle("프로필 공개", isOn: $viewModel.isProfilePublic)
                         .onChange(of: viewModel.isProfilePublic) { newValue in
-                            isUpdating = true
                             viewModel.updatePrivacySetting(to: newValue) { success in
-                                DispatchQueue.main.async {
-                                    isUpdating = false
-                                }
+                                // 추가 피드백 (예: 성공/실패 Alert)
                             }
                         }
                     
-                    if isUpdating {
+                    if viewModel.isUpdating {
                         ProgressView("업데이트 중...")
                             .padding(.top, 4)
+                    }
+                }
+                
+                Section(header: Text("계정 관리")) {
+                    Button(action: {
+                        // 계정 탈퇴 로직: 예를 들어 AuthService.deleteAccount() 호출 후 로그아웃 처리
+                        viewModel.deleteAccount { success in
+                            // 성공 시 로그인 뷰로 전환
+                        }
+                    }) {
+                        Text("계정 삭제")
+                            .foregroundColor(.red)
                     }
                 }
             }
@@ -37,11 +46,5 @@ struct ProfilePrivacyView: View {
                       dismissButton: .default(Text("확인")))
             }
         }
-    }
-}
-
-struct ProfilePrivacyView_Previews: PreviewProvider {
-    static var previews: some View {
-        ProfilePrivacyView()
     }
 }

@@ -3,8 +3,9 @@ import SwiftUI
 
 struct ChallengeSearchView: View {
     @StateObject var viewModel = ChallengeSearchViewModel()
-    @StateObject var challengeVM = ChallengeViewModel() // 추가: 챌린지 뷰모델 인스턴스 공유
-    
+    @StateObject var challengeVM = ChallengeViewModel() // 공유 인스턴스
+    @StateObject var participationCoordinator = ParticipationCoordinator() // 추가: 참여 코디네이터
+
     var body: some View {
         NavigationView {
             VStack {
@@ -19,8 +20,8 @@ struct ChallengeSearchView: View {
                 } else {
                     List(viewModel.filteredChallenges) { challenge in
                         NavigationLink(destination: ChallengeDetailView(challengeId: challenge.id)) {
-                            // 공유된 challengeVM 인스턴스를 전달합니다.
-                            ChallengeCardView(challenge: challenge, viewModel: challengeVM)
+                            // participationCoordinator를 함께 전달
+                            ChallengeCardView(challenge: challenge, viewModel: challengeVM, participationCoordinator: participationCoordinator)
                         }
                     }
                     .listStyle(PlainListStyle())
@@ -29,11 +30,5 @@ struct ChallengeSearchView: View {
             }
             .navigationTitle("챌린지 검색")
         }
-    }
-}
-
-struct ChallengeSearchView_Previews: PreviewProvider {
-    static var previews: some View {
-        ChallengeSearchView()
     }
 }

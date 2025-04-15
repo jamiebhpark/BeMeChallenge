@@ -1,19 +1,17 @@
 // HomeView.swift
 import SwiftUI
 
-import SwiftUI
-
 struct HomeView: View {
     @StateObject var challengeVM = ChallengeViewModel()
+    @StateObject var participationCoordinator = ParticipationCoordinator()
     
     var body: some View {
         NavigationView {
             ScrollView {
                 LazyVStack(spacing: 16) {
                     ForEach(challengeVM.challenges) { challenge in
-                        NavigationLink(destination: ChallengeDetailView(challengeId: challenge.id)) {
-                            ChallengeCardView(challenge: challenge, viewModel: challengeVM)
-                        }
+                        // ChallengeCardView에 participationCoordinator 전달
+                        ChallengeCardView(challenge: challenge, viewModel: challengeVM, participationCoordinator: participationCoordinator)
                     }
                 }
                 .padding()
@@ -21,6 +19,14 @@ struct HomeView: View {
             .navigationTitle("챌린지")
             .onAppear {
                 challengeVM.fetchChallenges()
+            }
+        }
+        // HomeView가 MainTabView 내에 있을 때 모달로 CameraView를 띄웁니다.
+        .fullScreenCover(isPresented: $participationCoordinator.showCameraView) {
+            if let challengeId = participationCoordinator.activeChallengeId {
+                CameraView(challengeId: challengeId)
+            } else {
+                EmptyView()
             }
         }
     }

@@ -5,36 +5,39 @@ struct PostCellView: View {
     var post: Post
     var reactionAction: (String) -> Void
     var reportAction: (() -> Void)?  // 신고 기능 호출 클로저
-    
+
     // 사용할 이모티콘 리스트
     let reactions: [String] = ["❤️", "👍", "😆", "🔥"]
-    
+
     var body: some View {
-        VStack(spacing: 4) {
-            // 이미지 로딩 (AsyncImage 사용)
+        VStack(spacing: 8) {
+            // 이미지 영역: 전체 너비를 채우도록 하고 고정 높이로 표시 (인스타그램 피드 스타일)
             AsyncImage(url: URL(string: post.imageUrl)) { phase in
                 switch phase {
                 case .empty:
                     ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: 150)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 300)
                 case .success(let image):
                     image
                         .resizable()
                         .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: 150)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 300)
                         .clipped()
                 case .failure:
                     Image(systemName: "photo")
                         .resizable()
                         .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: 150)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 300)
                 @unknown default:
                     EmptyView()
                 }
             }
             
-            // 반응 버튼과 신고 버튼을 포함한 HStack
-            HStack(spacing: 8) {
+            // 반응 버튼 및 신고 버튼 영역
+            HStack {
                 ForEach(reactions, id: \.self) { reaction in
                     Button(action: {
                         reactionAction(reaction)
@@ -45,44 +48,24 @@ struct PostCellView: View {
                                 .font(.caption2)
                         }
                         .padding(6)
-                        .background(Color.gray.opacity(0.2))
+                        .background(Color(.systemGray5))
                         .cornerRadius(8)
                     }
                 }
                 Spacer()
-                // 신고 버튼 (reportAction이 전달된 경우만 표시)
                 if let reportAction = reportAction {
                     Button(action: reportAction) {
                         Image(systemName: "flag.fill")
                             .foregroundColor(.red)
                     }
-                    .padding(4)
                 }
             }
-            .padding(4)
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
         }
         .background(Color.white)
         .cornerRadius(10)
-        .shadow(radius: 2)
-    }
-}
-
-struct PostCellView_Previews: PreviewProvider {
-    static var previews: some View {
-        let samplePost = Post(
-            id: "post1",
-            challengeId: "challenge1",
-            userId: "user1",
-            imageUrl: "https://example.com/sample.jpg",
-            createdAt: Date(),
-            reactions: ["❤️": 5, "👍": 3, "😆": 2, "🔥": 1],
-            reported: false
-        )
-        PostCellView(post: samplePost, reactionAction: { reaction in
-            print("Reaction: \(reaction)")
-        }, reportAction: {
-            print("Report action triggered")
-        })
-        .previewLayout(.sizeThatFits)
+        .shadow(radius: 3)
+        .padding(.horizontal)
     }
 }

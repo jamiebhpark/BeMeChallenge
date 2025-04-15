@@ -3,7 +3,6 @@ import Foundation
 import FirebaseFirestore
 import Combine
 
-// 모델 예제: Domain/Models/Challenge.swift
 struct Challenge: Identifiable, Codable {
     var id: String
     var title: String
@@ -15,9 +14,11 @@ struct Challenge: Identifiable, Codable {
 
 class ChallengeViewModel: ObservableObject {
     @Published var challenges: [Challenge] = []
+    // 사용자가 참여한 챌린지 ID를 저장할 집합
+    @Published var participatedChallenges: Set<String> = []
+    
     private var db = Firestore.firestore()
     
-    // 실시간 스냅샷 리스너 설정 – 변경 사항 자동 반영
     func fetchChallenges() {
         db.collection("challenges")
             .order(by: "createdAt", descending: true)
@@ -33,7 +34,6 @@ class ChallengeViewModel: ObservableObject {
                 print("Documents count: \(documents.count)")
                 self.challenges = documents.compactMap { doc in
                     let data = doc.data()
-                    print("Document data: \(data)")
                     guard let title = data["title"] as? String,
                           let description = data["description"] as? String,
                           let participantsCount = data["participantsCount"] as? Int,
@@ -43,19 +43,23 @@ class ChallengeViewModel: ObservableObject {
                 }
             }
     }
-
     
-    // 챌린지 참여 시 참여자 수 업데이트 예제
     func joinChallenge(challengeId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        // 이미 참여한 경우 실패 처리
+        if participatedChallenges.contains(challengeId) {
+            completion(.failure(NSError(domain: "ChallengeViewModel", code: 0, userInfo: [NSLocalizedDescriptionKey: "이미 참여하셨습니다."])))
+            return
+        }
+        
         let challengeRef = db.collection("challenges").document(challengeId)
         challengeRef.updateData(["participantsCount": FieldValue.increment(Int64(1))]) { error in
             if let error = error {
                 completion(.failure(error))
             } else {
+                // 참여 성공 시, 참여 집합에 해당 챌린지 ID 추가
+                self.participatedChallenges.insert(challengeId)
                 completion(.success(()))
             }
         }
     }
-    
-    // 추가: 참여 기록을 사용자 도큐먼트에 업데이트하는 로직도 구현 가능
 }

@@ -6,28 +6,37 @@ struct ChallengeDetailView: View {
     @StateObject var viewModel = ChallengeDetailViewModel()
     @State private var showReportAlert = false
     @State private var selectedPostId: String? = nil
-    
+
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
+            LazyVStack(spacing: 16) {
                 ForEach(viewModel.posts) { post in
-                    PostCellView(post: post, reactionAction: { reaction in
-                        ReactionService.shared.updateReaction(forPost: post.id, reactionType: reaction, userId: post.userId) { result in
-                            switch result {
-                            case .success:
-                                print("Reaction updated")
-                            case .failure(let error):
-                                print("Error updating reaction: \(error.localizedDescription)")
+                    PostCellView(
+                        post: post,
+                        reactionAction: { reaction in
+                            ReactionService.shared.updateReaction(
+                                forPost: post.id,
+                                reactionType: reaction,
+                                userId: post.userId
+                            ) { result in
+                                switch result {
+                                case .success:
+                                    print("Reaction updated")
+                                case .failure(let error):
+                                    print("Error updating reaction: \(error.localizedDescription)")
+                                }
                             }
+                        },
+                        reportAction: {
+                            selectedPostId = post.id
+                            showReportAlert = true
                         }
-                    }, reportAction: {
-                        selectedPostId = post.id
-                        showReportAlert = true
-                    })
+                    )
                 }
             }
-            .padding()
+            .padding(.vertical)
         }
+        .background(Color(UIColor.systemGroupedBackground))
         .navigationTitle("챌린지 콘텐츠")
         .onAppear {
             viewModel.fetchPosts(forChallenge: challengeId)
@@ -51,11 +60,5 @@ struct ChallengeDetailView: View {
                 secondaryButton: .cancel()
             )
         }
-    }
-}
-
-struct ChallengeDetailView_Previews: PreviewProvider {
-    static var previews: some View {
-        ChallengeDetailView(challengeId: "exampleChallengeId")
     }
 }
