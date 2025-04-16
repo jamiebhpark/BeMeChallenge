@@ -7,6 +7,7 @@ import SwiftUI
 class ProfilePrivacyViewModel: ObservableObject {
     @Published var isProfilePublic: Bool = true
     @Published var errorMessage: String? = nil
+    @Published var isUpdating: Bool = false
     
     private let db = Firestore.firestore()
     
@@ -17,14 +18,12 @@ class ProfilePrivacyViewModel: ObservableObject {
             return
         }
         db.collection("users").document(userId).getDocument { [weak self] snapshot, error in
-            if let error = error {
-                DispatchQueue.main.async {
+            DispatchQueue.main.async {
+                if let error = error {
                     self?.errorMessage = error.localizedDescription
+                    return
                 }
-                return
-            }
-            if let data = snapshot?.data() {
-                DispatchQueue.main.async {
+                if let data = snapshot?.data() {
                     self?.isProfilePublic = data["isProfilePublic"] as? Bool ?? true
                 }
             }
@@ -38,9 +37,30 @@ class ProfilePrivacyViewModel: ObservableObject {
             completion(false)
             return
         }
+        isUpdating = true
         db.collection("users").document(userId).updateData([
             "isProfilePublic": newValue
         ]) { error in
+            DispatchQueue.main.async {
+                self.isUpdating = false
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    completion(false)
+                } else {
+                    completion(true)
+                }
+            }
+        }
+    }
+    
+    /// 계정 탈퇴 로직 (Firebase Auth delete 사용)
+    func deleteAccount(completion: @escaping (Bool) -> Void) {
+        guard let user = Auth.auth().currentUser else {
+            self.errorMessage = "사용자 정보를 찾을 수 없습니다."
+            completion(false)
+            return
+        }
+        user.delete { error in
             DispatchQueue.main.async {
                 if let error = error {
                     self.errorMessage = error.localizedDescription

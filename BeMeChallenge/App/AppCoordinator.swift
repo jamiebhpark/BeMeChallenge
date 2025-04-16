@@ -27,6 +27,7 @@ struct OnboardingViewWrapper: View {
     var body: some View {
         OnboardingView()
             .onDisappear {
+                // 온보딩 완료 시 플래그를 true로 저장 (계정 삭제나 로그아웃 시에 초기화됨)
                 UserDefaults.standard.set(true, forKey: "hasSeenOnboarding")
             }
     }

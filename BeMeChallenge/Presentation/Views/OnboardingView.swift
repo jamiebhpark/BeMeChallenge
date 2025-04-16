@@ -1,3 +1,4 @@
+//OnboardingView.swift
 import SwiftUI
 
 // 온보딩 페이지 데이터를 표현하는 모델

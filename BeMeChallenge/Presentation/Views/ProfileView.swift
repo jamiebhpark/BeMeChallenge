@@ -9,14 +9,14 @@ struct ProfileView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 30) {
-                    // 1. 프로필 헤더 영역
+                    // 프로필 헤더 영역
                     ProfileHeaderView(viewModel: profileViewModel)
                     
-                    // 2. 프로필 완성도 뷰
-                    ProfileCompletionView()
+                    // 프로필 완성도 뷰
+                    ProfileCompletionView(profileViewModel: profileViewModel)
                         .padding(.horizontal)
                     
-                    // 3. 챌린지 참여 달력 영역
+                    // 챌린지 참여 달력 영역
                     VStack(alignment: .leading, spacing: 8) {
                         Text("챌린지 참여 달력")
                             .font(.headline)
@@ -26,7 +26,7 @@ struct ProfileView: View {
                         CalendarView(viewModel: profileViewModel.calendarViewModel)
                     }
                     
-                    // 4. 개인정보 설정 내비게이션 링크
+                    // 개인정보 설정 내비게이션 링크
                     NavigationLink(destination: ProfilePrivacyView()) {
                         HStack {
                             Text("개인정보 설정")
@@ -49,6 +49,16 @@ struct ProfileView: View {
             .navigationTitle("프로필")
             .onAppear {
                 profileViewModel.fetchUserProfile()
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("로그아웃") {
+                        authViewModel.signOut { result in
+                            // 로그아웃 후 필요한 추가 처리(예: 로그인 화면 전환)
+                        }
+                    }
+                    .foregroundColor(.red)
+                }
             }
         }
     }

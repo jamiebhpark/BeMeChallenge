@@ -11,10 +11,9 @@ struct ProfilePrivacyView: View {
                     Toggle("프로필 공개", isOn: $viewModel.isProfilePublic)
                         .onChange(of: viewModel.isProfilePublic) { newValue in
                             viewModel.updatePrivacySetting(to: newValue) { success in
-                                // 추가 피드백 (예: 성공/실패 Alert)
+                                // 추가 피드백 처리 가능
                             }
                         }
-                    
                     if viewModel.isUpdating {
                         ProgressView("업데이트 중...")
                             .padding(.top, 4)
@@ -22,12 +21,8 @@ struct ProfilePrivacyView: View {
                 }
                 
                 Section(header: Text("계정 관리")) {
-                    Button(action: {
-                        // 계정 탈퇴 로직: 예를 들어 AuthService.deleteAccount() 호출 후 로그아웃 처리
-                        viewModel.deleteAccount { success in
-                            // 성공 시 로그인 뷰로 전환
-                        }
-                    }) {
+                    // 계정 삭제 내비게이션 버튼를 추가합니다.
+                    NavigationLink(destination: AccountDeletionView().environmentObject(AuthService.shared)) {
                         Text("계정 삭제")
                             .foregroundColor(.red)
                     }
@@ -39,7 +34,7 @@ struct ProfilePrivacyView: View {
             }
             .alert(isPresented: Binding<Bool>(
                 get: { viewModel.errorMessage != nil },
-                set: { newValue in if !newValue { viewModel.errorMessage = nil } }
+                set: { _ in viewModel.errorMessage = nil }
             )) {
                 Alert(title: Text("오류"),
                       message: Text(viewModel.errorMessage ?? ""),
