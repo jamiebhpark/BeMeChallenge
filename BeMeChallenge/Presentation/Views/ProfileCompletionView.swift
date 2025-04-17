@@ -2,57 +2,51 @@
 import SwiftUI
 
 struct ProfileCompletionView: View {
-    // 외부에서 ProfileViewModel 인스턴스를 주입받습니다.
     @ObservedObject var profileViewModel: ProfileViewModel
-    
+
     var body: some View {
-        VStack(spacing: 20) {
-            Text("프로필 완성도")
-                .font(.headline)
-            
-            ProgressView(value: profileViewModel.completionPercentage, total: 100)
-                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
-                .padding(.horizontal)
-            
-            Text("당신의 프로필이 \(Int(profileViewModel.completionPercentage))% 완성되었습니다.")
-                .font(.subheadline)
-            
+        VStack(spacing: 16) {
+            HStack {
+                Text("프로필 완성도")
+                    .font(.headline)
+                Spacer()
+                Text("\(Int(profileViewModel.completionPercentage))%")
+                    .font(.subheadline).bold()
+            }
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(.systemGray5))
+                    .frame(height: 8)
+                Capsule()
+                    .fill(LinearGradient(
+                        colors: [Color("PrimaryGradientStart"), Color("PrimaryGradientEnd")],
+                        startPoint: .leading, endPoint: .trailing
+                    ))
+                    .frame(width: CGFloat(profileViewModel.completionPercentage / 100) * UIScreen.main.bounds.width * 0.8,
+                           height: 8)
+            }
+
             if profileViewModel.completionPercentage < 100 {
                 NavigationLink(destination: ProfileEditView(profileViewModel: profileViewModel)) {
                     Text("프로필 완성하기")
-                        .foregroundColor(.white)
-                        .padding()
+                        .font(.subheadline)
+                        .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
-                        .background(Color.blue)
+                        .background(Color("PrimaryGradientStart"))
+                        .foregroundColor(.white)
                         .cornerRadius(8)
                 }
-                .padding(.horizontal)
             } else {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.seal.fill")
                         .foregroundColor(.green)
-                    Text("프로필이 완성되었습니다.")
+                    Text("완료됨")
                         .foregroundColor(.green)
-                        .font(.headline)
+                        .font(.subheadline).bold()
                 }
-                .padding()
             }
-            
-            Spacer()
         }
         .padding()
-        .onAppear {
-            // 필요시 추가 작업(리프레시 등) 수행
-        }
-        .alert(isPresented: Binding<Bool>(
-            get: { profileViewModel.errorMessage != nil },
-            set: { _ in profileViewModel.errorMessage = nil }
-        )) {
-            Alert(
-                title: Text("오류"),
-                message: Text(profileViewModel.errorMessage ?? ""),
-                dismissButton: .default(Text("확인"))
-            )
-        }
     }
 }

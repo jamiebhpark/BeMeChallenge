@@ -3,52 +3,91 @@ import SwiftUI
 
 struct FeedbackView: View {
     @StateObject var viewModel = FeedbackViewModel()
-    @Environment(\.presentationMode) var presentationMode
-    
+    @Environment(\.dismiss) private var dismiss
+    @State private var showToast = false
+    @State private var toastMessage = ""
+    @State private var toastColor: Color = .green
+
     var body: some View {
-        NavigationView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("피드백을 작성해 주세요:")
-                    .font(.headline)
-                    .padding(.horizontal)
-                
+        ZStack(alignment: .top) {
+            // 1) 그룹드 배경
+            Color(.systemGroupedBackground)
+                .ignoresSafeArea()
+
+            // 2) 흰색 카드 스타일 콘텐츠
+            VStack(spacing: 16) {
+                SectionHeader(title: "피드백 보내기")
+
                 TextEditor(text: $viewModel.message)
-                    .border(Color.gray.opacity(0.5), width: 1)
-                    .frame(height: 200)
-                    .padding(.horizontal)
+                    .frame(height: 180)
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(12)
                 
-                if let errorMsg = viewModel.errorMessage {
-                    Text(errorMsg)
+                if let error = viewModel.errorMessage {
+                    Text(error)
+                        .font(.caption)
                         .foregroundColor(.red)
                         .padding(.horizontal)
                 }
-                
+
                 Spacer()
-                
-                Button(action: {
-                    viewModel.submitFeedback { success in
-                        if success {
-                            presentationMode.wrappedValue.dismiss()
-                        }
-                    }
-                }) {
-                    Text("피드백 제출")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                }
-                .padding(.horizontal)
+
+                Button("제출하기", action: submit)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color("PrimaryGradientEnd"))
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
             }
-            .padding(.top)
-            .navigationTitle("피드백")
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .shadow(radius: 1)
+            .padding(.horizontal)
+
+            // 3) 토스트 메시지
+            if showToast {
+                Text(toastMessage)
+                    .font(.subheadline).bold()
+                    .foregroundColor(.white)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .background(toastColor)
+                    .cornerRadius(8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(1)
+                    .padding(.top, 16)
+            }
+        }
+        .onTapGesture { hideKeyboard() }
+    }
+
+    private func submit() {
+        viewModel.submitFeedback { success in
+            toastMessage = success
+                ? "제출이 완료되었습니다!"
+                : (viewModel.errorMessage ?? "제출에 실패했습니다.")
+            toastColor = success ? .green : .red
+
+            withAnimation { showToast = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation { showToast = false }
+                if success { dismiss() }
+            }
         }
     }
 }
 
-struct FeedbackView_Previews: PreviewProvider {
-    static var previews: some View {
-        FeedbackView()
+// MARK: - Keyboard Dismiss Helper
+#if canImport(UIKit)
+extension View {
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil, from: nil, for: nil
+        )
     }
 }
+#endif
+

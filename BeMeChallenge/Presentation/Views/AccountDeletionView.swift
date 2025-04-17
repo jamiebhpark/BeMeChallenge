@@ -27,7 +27,6 @@ struct AccountDeletionView: View {
                 .padding()
             
             Button("계정 삭제") {
-                print("계정 삭제 버튼 눌림")
                 deletionAlert = .confirmation
             }
             .foregroundColor(.red)
@@ -42,7 +41,6 @@ struct AccountDeletionView: View {
                     title: Text("계정 삭제 확인"),
                     message: Text("정말 계정을 삭제하시겠습니까? 이 작업은 복구할 수 없습니다. 재인증이 필요할 수 있습니다."),
                     primaryButton: .destructive(Text("삭제")) {
-                        print("계정 삭제 확인됨")
                         deleteAccount()
                     },
                     secondaryButton: .cancel()

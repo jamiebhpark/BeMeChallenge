@@ -5,139 +5,112 @@ import FirebaseAuth
 import FirebaseStorage
 
 class ProfileViewModel: ObservableObject {
-    @Published var nickname: String = "닉네임"
+    // MARK: — Published Properties
+    @Published var nickname: String = ""
     @Published var profileImageURL: String? = nil
-    @Published var joinDateString: String = "2024-01-01"
     @Published var bio: String = ""
     @Published var location: String = ""
-    @Published var participationDates: [Date] = []
-    @Published var calendarViewModel: CalendarViewModel = CalendarViewModel()
-    
-    // 오류 처리용 프로퍼티 추가
     @Published var errorMessage: String? = nil
     
-    let db = Firestore.firestore()
+    // 캘린더 전용 뷰모델로 참여 기록 관리
+    @Published var calendarViewModel = CalendarViewModel()
     
-    // 프로필 완성도 계산 (닉네임, 프로필 이미지, bio, 위치 4가지 기준)
+    private let db = Firestore.firestore()
+    
+    /// 프로필 완성도: nickname, profileImageURL, bio, location 네 가지 기준
     var completionPercentage: Double {
-        let totalFields = 4.0
-        var filled: Double = 0.0
-        if !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { filled += 1.0 }
-        if let profileImageURL = profileImageURL, !profileImageURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { filled += 1.0 }
-        if !bio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { filled += 1.0 }
-        if !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { filled += 1.0 }
-        return (filled / totalFields) * 100.0
+        let values = [
+            nickname.trimmingCharacters(in: .whitespacesAndNewlines),
+            (profileImageURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines),
+            bio.trimmingCharacters(in: .whitespacesAndNewlines),
+            location.trimmingCharacters(in: .whitespacesAndNewlines)
+        ]
+        let filledCount = values.filter { !$0.isEmpty }.count
+        return Double(filledCount) / Double(values.count) * 100
     }
     
+    /// Firestore에서 사용자 프로필 데이터와 참여 기록을 함께 불러옵니다.
     func fetchUserProfile() {
-        guard let user = Auth.auth().currentUser else { return }
-        let userDocRef = db.collection("users").document(user.uid)
-        userDocRef.getDocument { snapshot, error in
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        let ref = db.collection("users").document(uid)
+        ref.getDocument { snapshot, error in
             if let error = error {
-                print("프로필 불러오기 실패: \(error.localizedDescription)")
+                DispatchQueue.main.async { self.errorMessage = error.localizedDescription }
                 return
             }
             guard let data = snapshot?.data() else { return }
             DispatchQueue.main.async {
-                self.nickname = data["nickname"] as? String ?? "닉네임"
-                if let joinTimestamp = data["joinDate"] as? Timestamp {
-                    let formatter = DateFormatter()
-                    formatter.dateFormat = "yyyy-MM-dd"
-                    self.joinDateString = formatter.string(from: joinTimestamp.dateValue())
-                }
+                self.nickname = data["nickname"] as? String ?? ""
                 self.profileImageURL = data["profileImageURL"] as? String
                 self.bio = data["bio"] as? String ?? ""
                 self.location = data["location"] as? String ?? ""
             }
-            self.calendarViewModel.fetchParticipation(userId: user.uid)
+            self.calendarViewModel.fetchParticipation(userId: uid)
         }
     }
     
-    func logCalendarView() {
-        if let userId = Auth.auth().currentUser?.uid {
-            let currentMonth = Calendar.current.component(.month, from: Date())
-            AnalyticsManager.shared.logProfileCalendarView(userId: userId, dateRange: "2024-\(currentMonth)")
-        }
-    }
-    
-    func updateNickname(newNickname: String, completion: @escaping (Bool) -> Void) {
-        guard let user = Auth.auth().currentUser else {
-            completion(false)
-            return
-        }
-        let userDocRef = db.collection("users").document(user.uid)
-        userDocRef.updateData(["nickname": newNickname]) { error in
+    /// 닉네임만 업데이트
+    func updateNickname(to newName: String, completion: @escaping (Bool) -> Void) {
+        guard let uid = Auth.auth().currentUser?.uid else { return completion(false) }
+        let ref = db.collection("users").document(uid)
+        ref.updateData(["nickname": newName]) { error in
             DispatchQueue.main.async {
                 if let error = error {
-                    print("닉네임 업데이트 실패: \(error.localizedDescription)")
+                    self.errorMessage = error.localizedDescription
                     completion(false)
                 } else {
-                    self.nickname = newNickname
+                    self.nickname = newName
                     completion(true)
                 }
             }
         }
     }
     
-    func updateProfilePicture(newImage: UIImage, completion: @escaping (Result<Void, Error>) -> Void) {
-        guard let user = Auth.auth().currentUser else {
-            completion(.failure(NSError(domain: "ProfileViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "사용자 정보를 찾을 수 없습니다."])))
-            return
-        }
-        guard let imageData = newImage.jpegData(compressionQuality: 0.8) else {
-            completion(.failure(NSError(domain: "ProfileViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "이미지 변환에 실패했습니다."])))
-            return
-        }
-        let storageRef = Storage.storage().reference().child("profile_images/\(user.uid).jpg")
-        let metadata = StorageMetadata()
-        metadata.contentType = "image/jpeg"
-        storageRef.putData(imageData, metadata: metadata) { _, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            storageRef.downloadURL { url, error in
+    /// bio·location 업데이트
+    func updateAdditionalInfo(bio: String, location: String, completion: @escaping (Bool) -> Void) {
+        guard let uid = Auth.auth().currentUser?.uid else { return completion(false) }
+        let ref = db.collection("users").document(uid)
+        ref.updateData([
+            "bio": bio,
+            "location": location
+        ]) { error in
+            DispatchQueue.main.async {
                 if let error = error {
-                    completion(.failure(error))
-                    return
+                    self.errorMessage = error.localizedDescription
+                    completion(false)
+                } else {
+                    self.bio = bio
+                    self.location = location
+                    completion(true)
                 }
-                guard let downloadURL = url else {
-                    completion(.failure(NSError(domain: "ProfileViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "Download URL is nil."])))
-                    return
-                }
-                let userDocRef = self.db.collection("users").document(user.uid)
-                userDocRef.updateData(["profileImageURL": downloadURL.absoluteString]) { error in
+            }
+        }
+    }
+    
+    /// 프로필 사진만 업데이트
+    func updateProfilePicture(_ image: UIImage, completion: @escaping (Result<Void,Error>) -> Void) {
+        guard let uid = Auth.auth().currentUser?.uid,
+              let data = image.jpegData(compressionQuality: 0.8)
+        else {
+            return completion(.failure(NSError(domain:"", code:-1, userInfo:nil)))
+        }
+        let storageRef = Storage.storage().reference().child("profile_images/\(uid).jpg")
+        storageRef.putData(data, metadata: StorageMetadata()) { _, error in
+            if let error = error { return completion(.failure(error)) }
+            storageRef.downloadURL { url, error in
+                if let error = error { return completion(.failure(error)) }
+                guard let url = url else { return completion(.failure(NSError(domain:"",code:-1,userInfo:nil))) }
+                self.db.collection("users").document(uid).updateData([
+                    "profileImageURL": url.absoluteString
+                ]) { error in
                     DispatchQueue.main.async {
                         if let error = error {
                             completion(.failure(error))
                         } else {
-                            self.profileImageURL = downloadURL.absoluteString
+                            self.profileImageURL = url.absoluteString
                             completion(.success(()))
                         }
                     }
-                }
-            }
-        }
-    }
-    
-    func updateAdditionalInfo(newBio: String, newLocation: String, completion: @escaping (Bool) -> Void) {
-        guard let user = Auth.auth().currentUser else {
-            completion(false)
-            return
-        }
-        let userDocRef = db.collection("users").document(user.uid)
-        userDocRef.updateData([
-            "bio": newBio,
-            "location": newLocation
-        ]) { error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("추가 정보 업데이트 실패: \(error.localizedDescription)")
-                    completion(false)
-                } else {
-                    self.bio = newBio
-                    self.location = newLocation
-                    completion(true)
                 }
             }
         }

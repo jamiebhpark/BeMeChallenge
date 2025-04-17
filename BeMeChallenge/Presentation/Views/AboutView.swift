@@ -1,70 +1,61 @@
+// AboutView.swift
 import SwiftUI
 
 struct AboutView: View {
-    // 앱 버전을 Bundle에서 읽어옵니다.
-    var appVersion: String {
+    private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     }
-    
+
     var body: some View {
-        NavigationView {
-            VStack(spacing: 20) {
-                // 앱 로고: Assets에 추가된 앱 로고 파일("appLogo")을 사용합니다.
+        List {
+            // 로고 & 앱 이름
+            VStack(spacing: 8) {
                 Image("appLogo")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 100, height: 100)
-                    .padding(.top, 40)
-                
+                    .padding(.top, 16)
                 Text("BeMe Challenge")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                
+                    .font(.title2).bold()
                 Text("Version \(appVersion)")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                
-                Divider()
-                    .padding(.vertical, 20)
-                
-                // 앱 설명 및 개인정보 처리방침 안내 내용
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("About")
-                        .font(.headline)
-                    
-                    Text("BeMe Challenge는 진정성 있는 실시간 콘텐츠를 통해 사용자가 서로 소통할 수 있는 SNS 서비스입니다. 필터 없이 있는 그대로의 순간을 공유하며, 다양한 챌린지를 통해 친구들과 더욱 깊은 관계를 형성할 수 있습니다.")
-                        .font(.body)
-                    
-                    Text("Privacy & Security")
-                        .font(.headline)
-                    
-                    Text("귀하의 개인정보와 데이터는 Firebase를 기반으로 안전하게 관리됩니다. 당사는 사용자의 개인 정보를 소중하게 다루며, 이를 제3자와 공유하지 않습니다.")
-                        .font(.body)
-                }
-                .padding(.horizontal)
-                
-                Spacer()
-                
-                // 개인정보 처리방침 링크 버튼
-                Button(action: {
-                    if let privacyURL = URL(string: "https://bemechallenge.com/privacy") {
-                        UIApplication.shared.open(privacyURL)
-                    }
-                }) {
-                    Text("Privacy Policy")
-                        .font(.footnote)
-                        .underline()
-                }
-                .padding(.bottom, 20)
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
             }
-            .padding()
-            .navigationTitle("About")
+            .frame(maxWidth: .infinity)
+            .listRowBackground(Color(.systemGroupedBackground))
+            .listRowInsets(.init(top: 0, leading: 0, bottom: 8, trailing: 0))
+            
+            // 앱 소개 섹션
+            Section(header: Text("앱 소개")) {
+                Text("""
+                BeMe Challenge는 필터 없는 진정성 있는 순간을 공유하는 SNS입니다. \
+                실시간 챌린지를 통해 챌린저들과 더 가까워질 수 있어요.
+                """)
+                  .font(.body)
+                  .lineSpacing(4)
+                  .padding(.vertical, 4)
+            }
+            
+            // 개인정보 처리방침 섹션
+            Section(header: Text("개인정보 처리방침")) {
+                Text("""
+                사용자의 개인정보는 Firebase를 통해 안전하게 보호되며, \
+                제3자와 공유되지 않습니다.
+                """)
+                  .font(.body)
+                  .lineSpacing(4)
+                  .padding(.vertical, 4)
+                
+                Button("개인정보 처리방침 보기") {
+                    if let url = URL(string: "https://bemechallenge.com/privacy") {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                .font(.subheadline)
+                .foregroundColor(.blue)
+                .padding(.vertical, 8)
+            }
         }
-    }
-}
-
-struct AboutView_Previews: PreviewProvider {
-    static var previews: some View {
-        AboutView()
+        .listStyle(InsetGroupedListStyle())
     }
 }

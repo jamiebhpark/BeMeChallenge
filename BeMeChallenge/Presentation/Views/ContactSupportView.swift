@@ -1,85 +1,91 @@
-// Presentation/Views/ContactSupportView.swift
+// ContactSupportView.swift
 import SwiftUI
 import MessageUI
 
 struct ContactSupportView: View {
-    @State private var isShowingMailView = false
-    @State private var mailResult: Result<MFMailComposeResult, Error>? = nil
-    @State private var showMailErrorAlert = false
-    
+    @State private var showMail = false
+    @State private var mailError = false
+
     var body: some View {
-        VStack {
-            Text("문의 사항이나 지원 요청이 있으시면, 아래 버튼을 통해 이메일을 보내주세요.")
-                .padding()
-            
-            Button("이메일 보내기") {
-                if MFMailComposeViewController.canSendMail() {
-                    isShowingMailView = true
-                } else {
-                    showMailErrorAlert = true
+        ScrollView {
+            VStack(spacing: 24) {
+                Text("지원이 필요하신가요? 이메일로 언제든지 문의해주세요.")
+                    .font(.body)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                Button(action: {
+                    if MFMailComposeViewController.canSendMail() {
+                        showMail = true
+                    } else {
+                        mailError = true
+                    }
+                }) {
+                    Label("이메일 보내기", systemImage: "envelope.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color("PrimaryGradientEnd"))
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                        .padding(.horizontal)
                 }
+
+                Spacer()
             }
-            .padding()
-            .background(Color.blue)
-            .foregroundColor(.white)
-            .cornerRadius(8)
+            .padding(.top)
         }
-        .navigationTitle("문의하기")
-        .sheet(isPresented: $isShowingMailView) {
-            MailView(result: $mailResult)
+        .sheet(isPresented: $showMail) {
+            MailView(result: .constant(nil))
         }
-        .alert(isPresented: $showMailErrorAlert) {
-            Alert(title: Text("메일 사용 불가"), message: Text("이 기기에서 이메일을 보낼 수 없습니다. Mail 앱을 이용해 주세요."), dismissButton: .default(Text("확인")))
+        .alert("메일 전송 실패", isPresented: $mailError) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("이 기기에서 이메일을 보낼 수 없습니다.")
         }
     }
 }
 
-struct ContactSupportView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationView {
-            ContactSupportView()
-        }
-    }
-}
+// MARK: - MFMailComposeController Wrapper
 
-// MailView.swift : MFMailComposeViewController를 SwiftUI에 연동하기 위한 래퍼
 struct MailView: UIViewControllerRepresentable {
-    @Environment(\.presentationMode) var presentation
+    @Environment(\.presentationMode) private var presentationMode
     @Binding var result: Result<MFMailComposeResult, Error>?
-    
+
     class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
-        @Binding var presentation: PresentationMode
+        @Binding var presentationMode: PresentationMode
         @Binding var result: Result<MFMailComposeResult, Error>?
-        
-        init(presentation: Binding<PresentationMode>, result: Binding<Result<MFMailComposeResult, Error>?>) {
-            _presentation = presentation
+
+        init(presentationMode: Binding<PresentationMode>,
+             result: Binding<Result<MFMailComposeResult, Error>?>) {
+            _presentationMode = presentationMode
             _result = result
         }
-        
+
         func mailComposeController(_ controller: MFMailComposeViewController,
                                    didFinishWith result: MFMailComposeResult,
                                    error: Error?) {
-            defer { $presentation.wrappedValue.dismiss() }
+            defer { presentationMode.dismiss() }
             if let error = error {
                 self.result = .failure(error)
-                return
+            } else {
+                self.result = .success(result)
             }
-            self.result = .success(result)
         }
     }
-    
+
     func makeCoordinator() -> Coordinator {
-        return Coordinator(presentation: presentation, result: $result)
+        Coordinator(presentationMode: presentationMode, result: $result)
     }
-    
+
     func makeUIViewController(context: Context) -> MFMailComposeViewController {
         let vc = MFMailComposeViewController()
-        vc.setToRecipients(["support@bemechallenge.com"]) // 실제 지원 이메일로 변경
-        vc.setSubject("BeMe Challenge 지원 문의")
-        vc.setMessageBody("문의 내용을 여기에 작성해 주세요.", isHTML: false)
+        vc.setToRecipients(["support@bemechallenge.com"])
+        vc.setSubject("[BeMe Challenge] 지원 요청")
+        vc.setMessageBody("안녕하세요,\n\n문의 내용을 작성해주세요.", isHTML: false)
         vc.mailComposeDelegate = context.coordinator
         return vc
     }
-    
-    func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: Context) { }
+
+    func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: Context) {}
 }
