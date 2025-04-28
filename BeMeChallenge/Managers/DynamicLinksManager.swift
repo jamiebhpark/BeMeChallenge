@@ -1,63 +1,77 @@
+//DynamicLinksManager.swift
 import FirebaseDynamicLinks
 import UIKit
 
 class DynamicLinksManager {
     static let shared = DynamicLinksManager()
 
-    /// 주어진 챌린지 ID에 대해 동적 링크를 생성합니다.
-    /// - Parameters:
-    ///   - challengeId: 공유할 챌린지의 ID
-    ///   - completion: 생성된 짧은 URL이 반환됩니다. 실패 시 nil.
-    func generateDynamicLink(forChallenge challengeId: String, completion: @escaping (URL?) -> Void) {
-        // 기본 링크: 웹 URL로 챌린지 페이지를 지정합니다.
+    private let domainURIPrefix = "https://bemechallenge.page.link"
+
+    /// 챌린지 단위 공유 (기존)
+    func generateDynamicLink(forChallenge challengeId: String,
+                             completion: @escaping (URL?) -> Void) {
         guard let link = URL(string: "https://bemechallenge.com/challenge/\(challengeId)") else {
-            completion(nil)
-            return
+            completion(nil); return
         }
-        
-        // 도메인 URI Prefix는 Firebase Console에서 설정한 값을 사용합니다.
-        let dynamicLinksDomainURIPrefix = "https://bemechallenge.page.link"
-        guard let linkBuilder = DynamicLinkComponents(link: link, domainURIPrefix: dynamicLinksDomainURIPrefix) else {
-            completion(nil)
-            return
+        makeLink(from: link, completion: completion)
+    }
+
+    /// **포스트 단위** 공유용 딥링크 생성
+    func generateDynamicLink(forPost post: Post,
+                             completion: @escaping (URL?) -> Void) {
+        // 예: /challenge/{challengeId}/post/{postId}
+        guard let link = URL(string:
+            "https://bemechallenge.com/challenge/\(post.challengeId)/post/\(post.id)"
+        ) else {
+            completion(nil); return
         }
-        
-        // iOS 파라미터 설정: 번들ID와 App Store ID를 지정합니다.
-        linkBuilder.iOSParameters = DynamicLinkIOSParameters(bundleID: Bundle.main.bundleIdentifier!)
-        linkBuilder.iOSParameters?.appStoreID = "123456789" // 실제 App Store ID로 교체하세요.
-        
-        // (선택 사항) 소셜 메타 태그 파라미터 설정: 공유 시 미리보기로 보여질 정보
-        let socialParams = DynamicLinkSocialMetaTagParameters()
-        socialParams.title = "BeMe Challenge"
-        socialParams.descriptionText = "이 챌린지에 참여해보세요! 진짜 일상을 나누는 새로운 방식."
-        socialParams.imageURL = URL(string: "https://example.com/path/to/challenge/image.png") // 실제 이미지 URL로 교체
-        linkBuilder.socialMetaTagParameters = socialParams
-        
-        // 동적 링크를 단축(short) URL로 변환합니다.
-        linkBuilder.shorten { shortURL, warnings, error in
+        makeLink(from: link, completion: completion)
+    }
+
+    /// 공통 빌더
+    private func makeLink(from link: URL,
+                          completion: @escaping (URL?) -> Void) {
+        guard let builder = DynamicLinkComponents(
+            link: link,
+            domainURIPrefix: domainURIPrefix
+        ) else {
+            completion(nil); return
+        }
+
+        // iOS 파라미터
+        let ios = DynamicLinkIOSParameters(bundleID: Bundle.main.bundleIdentifier!)
+        ios.appStoreID = "123456789" // 실제 ID
+        builder.iOSParameters = ios
+
+        // 소셜 미리보기
+        let social = DynamicLinkSocialMetaTagParameters()
+        social.title = "BeMe Challenge"
+        social.descriptionText = "진짜 일상을 나누는 챌린지, 지금 확인해보세요!"
+        // 대표 이미지가 있으면 여기에 URL
+        // social.imageURL = URL(string: "https://bemechallenge.com/assets/share.png")
+        builder.socialMetaTagParameters = social
+
+        // 단축 링크 생성
+        builder.shorten { url, _, error in
             if let error = error {
-                print("Dynamic Link 생성 오류: \(error.localizedDescription)")
-                completion(nil)
-                return
+                print("🔗 Dynamic Link error:", error)
             }
-            if let warnings = warnings {
-                for warning in warnings {
-                    print("Dynamic Link Warning: \(warning)")
-                }
-            }
-            completion(shortURL)
+            completion(url)
         }
     }
 
-    /// 앱 실행 시 전달된 dynamicLink를 처리하여 챌린지 ID를 추출합니다.
-    /// - Parameter dynamicLink: 앱으로 전달된 DynamicLink 객체
-    /// - Returns: 추출된 챌린지 ID (예: "challenge123"), 없으면 nil
+    /// 앱 실행 시 딥링크 처리 (기존)
     func handleDynamicLink(_ dynamicLink: DynamicLink?) -> String? {
         guard let url = dynamicLink?.url else { return nil }
-        // URL 구조 예: https://bemechallenge.com/challenge/{challengeId}
-        let pathComponents = url.pathComponents
-        if pathComponents.count >= 3, pathComponents[1] == "challenge" {
-            return pathComponents[2]
+        let comps = url.pathComponents
+        if comps.count >= 5,
+           comps[1] == "challenge",
+           comps[3] == "post" {
+            return comps[4] // postId
+        }
+        // 혹은 challenge-only
+        if comps.count >= 3, comps[1] == "challenge" {
+            return comps[2]
         }
         return nil
     }

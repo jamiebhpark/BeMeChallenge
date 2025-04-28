@@ -1,40 +1,46 @@
-// HomeView.swift
+// Presentation/Views/HomeView.swift
 import SwiftUI
 
 struct HomeView: View {
-    @StateObject var challengeVM = ChallengeViewModel()
-    @StateObject var participationCoordinator = ParticipationCoordinator()
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(challengeVM.challenges) { challenge in
-                        // ChallengeCardView에 participationCoordinator 전달
-                        ChallengeCardView(challenge: challenge, viewModel: challengeVM, participationCoordinator: participationCoordinator)
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("챌린지")
-            .onAppear {
-                challengeVM.fetchChallenges()
-            }
-        }
-        // HomeView가 MainTabView 내에 있을 때 모달로 CameraView를 띄웁니다.
-        .fullScreenCover(isPresented: $participationCoordinator.showCameraView) {
-            if let challengeId = participationCoordinator.activeChallengeId {
-                CameraView(challengeId: challengeId)
-            } else {
-                EmptyView()
-            }
-        }
-    }
-}
+  @StateObject private var vm = ChallengeViewModel()
+  @StateObject private var coord = ParticipationCoordinator()
+  @State private var selectedType: ChallengeType = .mandatory
 
-struct HomeView_Previews: PreviewProvider {
-    static var previews: some View {
-        HomeView()
-    }
-}
+  var body: some View {
+    NavigationView {
+      VStack {
+        // 1) 상단 탭 (필수 / 오픈)
+        Picker("챌린지 타입", selection: $selectedType) {
+          Text(ChallengeType.mandatory.rawValue).tag(ChallengeType.mandatory)
+          Text(ChallengeType.open.rawValue).tag(ChallengeType.open)
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal)
 
+        // 2) 선택된 타입에 맞춰 ChallengeCardView 나열
+        ScrollView {
+          LazyVStack(spacing: 16) {
+            ForEach(vm.challenges.filter { $0.type == selectedType }) { ch in
+              ChallengeCardView(
+                challenge: ch,
+                viewModel: vm,
+                participationCoordinator: coord
+              )
+            }
+          }
+          .padding()
+        }
+      }
+      .navigationTitle("챌린지")
+    }
+    // CameraView 모달 띄우기
+    .fullScreenCover(isPresented: $coord.showCameraView) {
+      if let id = coord.activeChallengeId {
+        CameraView(challengeId: id)
+      }
+    }
+    .onAppear {
+      vm.fetchChallenges()
+    }
+  }
+}

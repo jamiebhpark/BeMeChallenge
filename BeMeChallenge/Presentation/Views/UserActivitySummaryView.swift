@@ -47,9 +47,3 @@ struct ActivityTile: View {
         .cornerRadius(12)
     }
 }
-
-struct UserActivitySummaryView_Previews: PreviewProvider {
-    static var previews: some View {
-        UserActivitySummaryView()
-    }
-}
