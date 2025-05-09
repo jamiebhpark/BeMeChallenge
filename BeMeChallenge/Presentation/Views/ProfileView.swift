@@ -1,69 +1,94 @@
-// ProfileView.swift
+// Presentation/Views/ProfileView.swift
 import SwiftUI
 
 struct ProfileView: View {
-    @EnvironmentObject var authViewModel: AuthViewModel
-    @StateObject private var profileVM = ProfileViewModel()
-    @State private var showEdit = false
+    @EnvironmentObject private var authVM: AuthViewModel
+    @StateObject private var vm = ProfileViewModel()
+
+    @State private var navPath      = NavigationPath()
+    @State private var showSettings = false
+
+    private let columns = Array(
+        repeating: GridItem(.flexible(), spacing: 4),
+        count: 3
+    )
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navPath) {
             List {
-                // MARK: - 프로필 헤더 (터치 → 편집)
+                // ── 헤더
                 Section {
-                    ProfileHeaderView(viewModel: profileVM)
-                        .onTapGesture { showEdit = true }
-                        .listRowInsets(EdgeInsets())
+                    ProfileHeaderView(viewModel: vm)
+                        .onTapGesture {
+                            navPath.append(ProfileDestination.editProfile)
+                        }
+                        .listRowInsets(.init())
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                 }
-                
-                // MARK: - 나의 성과
+
+                // ── 연속 & 총 참여
                 Section(header: Text("나의 성과")) {
-                    StreakView()
-                }
-                
-                // MARK: - 참여 달력
-                Section(header: Text("참여 달력")) {
-                    CalendarView(viewModel: profileVM.calendarViewModel)
-                        .frame(height: 250)
-                        .listRowBackground(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(.systemBackground))
-                        )
+                    StreakView(
+                        totalParticipations: vm.totalParticipations,
+                        streakDays:          vm.currentStreak
+                    )
+                    .listRowBackground(Color(.systemBackground))
                 }
 
-                // MARK: - 개인정보
-                Section(header: Text("개인정보")) {
-                    NavigationLink("개인정보 설정") {
-                        ProfilePrivacyView()
-                            .environmentObject(authViewModel)
+                // ── 내 포스트 썸네일 그리드
+                Section(header: Text("내 포스트")) {
+                    LazyVGrid(columns: columns, spacing: 4) {
+                        ForEach(vm.userPosts) { post in
+                            Button {
+                                // **한 번만** 피드 화면으로 이동
+                                if let id = post.id {
+                                    navPath.append(ProfileDestination.feed(initialPostID: id))
+                                }
+                            } label: {
+                                ThumbnailView(url: URL(string: post.imageUrl))
+                                    .frame(height: 100)
+                                    .clipped()
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                }
-
-                // MARK: - 지원
-                Section(header: Text("지원")) {
-                    NavigationLink("앱 정보", destination: AboutView())
-                    NavigationLink("도움말 & FAQ", destination: HelpFAQView())
-                    NavigationLink("피드백 보내기", destination: FeedbackView())
-                }
-
-                // MARK: - 로그아웃
-                Section {
-                    Button("로그아웃", role: .destructive) {
-                        authViewModel.signOut()
-                    }
+                    .padding(.vertical, 4)
+                    .listRowInsets(.init())
+                    .listRowBackground(Color(.systemBackground))
                 }
             }
             .listStyle(.insetGrouped)
             .navigationTitle("프로필")
-            // 더 이상 fetchUserProfile() 호출이 필요 없습니다.
-            // .onAppear { /* nothing */ }
-
-            // iOS16+ 전용: showEdit 바인딩으로 편집 화면 띄우기
-            .navigationDestination(isPresented: $showEdit) {
-                ProfileEditView(profileViewModel: profileVM)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showSettings = true } label: {
+                        Image(systemName: "gearshape")
+                            .font(.title3)
+                    }
+                    .sheet(isPresented: $showSettings) {
+                        SettingsView().environmentObject(authVM)
+                    }
+                }
+            }
+            // === 네비게이션 목적지 선언 ===
+            .navigationDestination(for: ProfileDestination.self) { dest in
+                switch dest {
+                case .editProfile:
+                    ProfileEditView(profileViewModel: vm)
+                case .feed(let initialID):
+                    UserPostListView(
+                        profileVM: vm,
+                        initialPostID: initialID
+                    )
+                }
             }
         }
     }
+}
+
+/// ProfileView.swift 옆에 추가
+enum ProfileDestination: Hashable {
+    case editProfile
+    case feed(initialPostID: String)
 }

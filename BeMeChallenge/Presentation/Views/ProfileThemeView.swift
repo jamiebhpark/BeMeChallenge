@@ -58,9 +58,3 @@ struct ProfileThemeView: View {
         }
     }
 }
-
-struct ProfileThemeView_Previews: PreviewProvider {
-    static var previews: some View {
-        ProfileThemeView()
-    }
-}

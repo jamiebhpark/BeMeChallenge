@@ -58,9 +58,3 @@ struct ReferralProgramView: View {
         }
     }
 }
-
-struct ReferralProgramView_Previews: PreviewProvider {
-    static var previews: some View {
-        ReferralProgramView()
-    }
-}

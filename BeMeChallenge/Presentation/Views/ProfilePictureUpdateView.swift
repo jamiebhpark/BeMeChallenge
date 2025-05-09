@@ -1,63 +1,81 @@
-//
-//  ProfilePictureUpdateView.swift
-//  BeMeChallenge
-//
-
+// Presentation/Views/ProfilePictureUpdateView.swift
 import SwiftUI
 
 struct ProfilePictureUpdateView: View {
-    // 부모(예: ProfileEditView)에서 주입
     @ObservedObject var profileVM: ProfileViewModel
-
     @Environment(\.dismiss) private var dismiss
     @State private var selectedImage: UIImage?
     @State private var isPickerPresented = false
     @State private var isUploading      = false
     @State private var uploadError: String?
 
-    var body: some View {
-        VStack(spacing: 20) {
+    private var avatarURL: URL? {
+        guard let base = profileVM.profileImageURL else { return nil }
+        if let v = profileVM.profileImageUpdatedAt {
+            let sep = base.contains("?") ? "&" : "?"
+            return URL(string: "\(base)\(sep)v=\(Int(v))")
+        }
+        return URL(string: base)
+    }
 
+    var body: some View {
+        VStack(spacing: 24) {
             // ── 미리보기 썸네일 ────────────────────────────────
             Group {
                 if let image = selectedImage {
-                    Image(uiImage: image)
-                        .resizable()
-                } else if
-                    let urlString = profileVM.profileImageURL,
-                    let url       = URL(string: urlString)
-                {
-                    AsyncCachedImage(
-                        url: url,
-                        content: { $0.resizable() },
-                        placeholder: { Image("defaultAvatar").resizable() },
-                        failure:     { Image("defaultAvatar").resizable() }
-                    )
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else if let url = avatarURL {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:    ProgressView()
+                        case .failure:  Image("defaultAvatar").resizable()
+                        case .success(let img): img.resizable().scaledToFill()
+                        @unknown default: EmptyView()
+                        }
+                    }
+                    .id(url)
                 } else {
-                    Image("defaultAvatar")
-                        .resizable()
+                    Image("defaultAvatar").resizable()
                 }
             }
-            .aspectRatio(contentMode: .fill)
             .frame(width: 150, height: 150)
             .clipShape(Circle())
             .shadow(radius: 4)
 
             // ── 액션 버튼들 ────────────────────────────────────
-            Button("프로필 사진 선택") { isPickerPresented = true }
+            VStack(spacing: 16) {
+                // 사진 선택
+                Button("프로필 사진 선택") {
+                    isPickerPresented = true
+                }
                 .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal)
 
-            if isUploading { ProgressView("업로드 중…") }
+                // 기본 아바타로 되돌리기
+                Button("기본 아바타로 되돌리기") {
+                    // ViewModel에 resetProfilePicture() 구현 필요
+                    profileVM.resetProfilePicture()
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal)
 
-            Button("사진 업데이트") {
-                guard let img = selectedImage else { return }
-                upload(img)
+                // 사진 업데이트
+                Button("사진 업데이트") {
+                    guard let img = selectedImage else { return }
+                    upload(img)
+                }
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal)
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color("PrimaryGradientEnd"))
-            .foregroundColor(.white)
-            .cornerRadius(10)
+
+            if isUploading {
+                ProgressView("업로드 중…")
+                    .padding(.top, 8)
+            }
 
             Spacer()
         }
@@ -75,7 +93,6 @@ struct ProfilePictureUpdateView: View {
         }
     }
 
-    // MARK: - Upload Helper
     private func upload(_ image: UIImage) {
         isUploading = true
         profileVM.updateProfilePicture(image) { result in
@@ -83,7 +100,7 @@ struct ProfilePictureUpdateView: View {
                 isUploading = false
                 switch result {
                 case .success:
-                    dismiss()               // 완료 후 화면 닫기
+                    dismiss()
                 case .failure(let err):
                     uploadError = err.localizedDescription
                 }
@@ -91,3 +108,4 @@ struct ProfilePictureUpdateView: View {
         }
     }
 }
+

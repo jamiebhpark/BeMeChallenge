@@ -13,7 +13,7 @@ public struct User: Identifiable, Codable {
     public let isProfilePublic: Bool
     public let fcmToken: String?
 
-    // 1) Firestore DocumentSnapshot → User
+    // 1) DocumentSnapshot → User
     public init?(document: DocumentSnapshot) {
         let data = document.data() ?? [:]
         guard
@@ -27,7 +27,6 @@ public struct User: Identifiable, Codable {
         self.bio = data["bio"] as? String
         self.location = data["location"] as? String
         self.profileImageURL = data["profileImageURL"] as? String
-        // 새로 추가된 타임스탬프 필드
         if let ts = data["profileImageUpdatedAt"] as? Timestamp {
             self.profileImageUpdatedAt = ts.dateValue().timeIntervalSince1970
         } else {
@@ -37,7 +36,7 @@ public struct User: Identifiable, Codable {
         self.fcmToken = data["fcmToken"] as? String
     }
 
-    // 2) Firestore QueryDocumentSnapshot → User
+    // 2) QueryDocumentSnapshot → User
     public init?(document: QueryDocumentSnapshot) {
         let data = document.data()
         guard
@@ -81,7 +80,7 @@ public struct User: Identifiable, Codable {
         self.fcmToken = fcmToken
     }
 
-    /// 캐시 무시용 버전 쿼리까지 붙인 최종 URL
+    /// 캐시 무시용 버전 쿼리를 붙여서 URL 생성
     public var effectiveProfileImageURL: URL? {
         guard let base = profileImageURL else { return nil }
         if let v = profileImageUpdatedAt {

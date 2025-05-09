@@ -39,9 +39,3 @@ struct LoginViewWrapper: View {
         LoginView(authViewModel: authViewModel) // 이미 생성된 인스턴스를 전달
     }
 }
-
-struct AppCoordinator_Previews: PreviewProvider {
-    static var previews: some View {
-        AppCoordinator()
-    }
-}
