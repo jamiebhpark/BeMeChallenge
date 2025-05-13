@@ -6,137 +6,92 @@ import Combine
 
 @MainActor
 final class ChallengeViewModel: ObservableObject {
-    // 전체 챌린지
-    @Published var challenges: [Challenge] = []
-    // 중복 참여 방지 (전체)
-    @Published var participatedChallenges: Set<String> = []
-    // 오늘(00:00 이후) 참여한 챌린지만 따로 관리
-    @Published var todayParticipations: Set<String> = []
-
+    
+    // MARK: - Published
+    @Published private(set) var challengesState: Loadable<[Challenge]> = .idle
+    @Published private(set) var todayParticipations: Set<String> = []
+    
+    // MARK: - Private
     private let db = Firestore.firestore()
     private var listener: ListenerRegistration?
-
-    init() {
-        fetchChallenges()
-        fetchParticipatedChallenges()
-        fetchTodayParticipations()
+    private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - Init / Deinit
+    init() { fetchChallenges() ; fetchTodayParticipations() }
+    deinit { listener?.remove() }
+    
+    // MARK: - Public API
+    
+    /// UI 가 직접 구독하는 배열 프로퍼티
+    var challenges: [Challenge] { challengesState.value ?? [] }
+    
+    /// 챌린지 참여 - 결과는 Combine 의 `Result` 스트림으로 반환
+    func participate(in challenge: Challenge) -> AnyPublisher<Void,Error> {
+        Future { [weak self] promise in
+            guard let self, let uid = Auth.auth().currentUser?.uid else {
+                return promise(.failure(NSError(domain:"Auth", code:-1)))
+            }
+            self.performJoin(uid: uid, challenge: challenge, promise: promise)
+        }
+        .eraseToAnyPublisher()
     }
-
-    deinit {
-        listener?.remove()
-    }
-
-    /// 전체 챌린지 로드
-    func fetchChallenges() {
+    
+    // MARK: - Private helpers
+    
+    private func fetchChallenges() {
+        challengesState = .loading
         listener = db.collection("challenges")
             .order(by: "createdAt", descending: true)
             .addSnapshotListener { [weak self] snap, err in
-                guard let self = self else { return }
-                if let err = err {
-                    print("Error fetching challenges:", err.localizedDescription)
-                    return
-                }
-                self.challenges = snap?.documents.compactMap(Challenge.init) ?? []
+                guard let self else { return }
+                if let err = err { self.challengesState = .failed(err); return }
+                let list = snap?.documents.compactMap(Challenge.init) ?? []
+                self.challengesState = .loaded(list)
             }
     }
-
-    /// 전체 참여 기록(중복 방지) 로드
-    private func fetchParticipatedChallenges() {
-        guard let uid = Auth.auth().currentUser?.uid else { return }
-        db.collection("users")
-            .document(uid)
-            .collection("participations")
-            .getDocuments { [weak self] snap, _ in
-                guard let docs = snap?.documents else { return }
-                DispatchQueue.main.async {
-                    self?.participatedChallenges = Set(docs.map { $0.documentID })
-                }
-            }
-    }
-
-    /// 오늘(00:00 이후) 참여 기록만 로드
+    
     private func fetchTodayParticipations() {
         guard let uid = Auth.auth().currentUser?.uid else { return }
         let startOfDay = Calendar.current.startOfDay(for: Date())
-        db.collection("users")
-            .document(uid)
+        db.collection("users").document(uid)
             .collection("participations")
             .whereField("date", isGreaterThanOrEqualTo: startOfDay)
-            .getDocuments { [weak self] snap, _ in
-                guard let docs = snap?.documents else { return }
-                let ids = docs.compactMap { $0.data()["challengeId"] as? String }
-                DispatchQueue.main.async {
-                    self?.todayParticipations = Set(ids)
-                }
+            .addSnapshotListener { [weak self] snap, _ in
+                let ids = snap?.documents
+                    .compactMap { $0.data()["challengeId"] as? String } ?? []
+                self?.todayParticipations = Set(ids)
             }
     }
-
-    /// 챌린지 참여 (필수는 하루 1회, 오픈은 무제한)
-    func joinChallenge(challenge: Challenge,
-                       completion: @escaping (Result<Void, Error>) -> Void) {
-        guard let uid = Auth.auth().currentUser?.uid else {
-            let e = NSError(domain: "Auth", code: -1,
-                            userInfo: [NSLocalizedDescriptionKey: "로그인이 필요합니다."])
-            return completion(.failure(e))
+    
+    private func performJoin(uid: String,
+                             challenge: Challenge,
+                             promise: @escaping (Result<Void,Error>) -> Void) {
+        // ⚡️ 하루 1회 제한 체크 제거 → 이미 todayParticipations 에 포함돼 있으면 early fail
+        if challenge.type == .mandatory, todayParticipations.contains(challenge.id) {
+            promise(.failure(NSError(domain:"Challenge", code:0,
+                                     userInfo:[NSLocalizedDescriptionKey:"이미 참여"])))
+            return
         }
-
-        // 필수 챌린지: 오늘 참여 여부 먼저 체크
-        if challenge.type == .mandatory {
-            let startOfDay = Calendar.current.startOfDay(for: Date())
-            db.collection("users")
-                .document(uid)
-                .collection("participations")
-                .whereField("challengeId", isEqualTo: challenge.id)
-                .whereField("date", isGreaterThanOrEqualTo: startOfDay)
-                .getDocuments { [weak self] snap, err in
-                    if let err = err {
-                        return completion(.failure(err))
-                    }
-                    if let count = snap?.documents.count, count > 0 {
-                        let e = NSError(domain: "ChallengeViewModel", code: 0,
-                                        userInfo: [NSLocalizedDescriptionKey: "오늘 이미 참여하셨습니다."])
-                        completion(.failure(e))
-                    } else {
-                        self?.performJoin(challengeId: challenge.id, uid: uid, completion: completion)
-                    }
-                }
-        } else {
-            // 오픈 챌린지: 즉시 참여
-            performJoin(challengeId: challenge.id, uid: uid, completion: completion)
+        let challengeRef = db.collection("challenges").document(challenge.id)
+        challengeRef.updateData(["participantsCount": FieldValue.increment(Int64(1))]) { [weak self] err in
+            if let err { return promise(.failure(err)) }
+            self?.appendParticipationDoc(uid: uid, challengeID: challenge.id, promise: promise)
         }
     }
-
-    /// 실제 Firestore 업데이트 + 참여 기록 추가
-    private func performJoin(challengeId: String,
-                             uid: String,
-                             completion: @escaping (Result<Void, Error>) -> Void) {
-        let challengeRef = db.collection("challenges").document(challengeId)
-        challengeRef.updateData([
-            "participantsCount": FieldValue.increment(Int64(1))
-        ]) { [weak self] err in
-            if let err = err {
-                return completion(.failure(err))
-            }
-            // participation 문서는 auto-ID로 생성 (오픈은 여러 번)
-            let newDoc = self?.db.collection("users")
-                .document(uid)
-                .collection("participations")
-                .document()
-            newDoc?.setData([
-                "challengeId": challengeId,
-                "date": FieldValue.serverTimestamp()
-            ]) { err in
-                if let err = err {
-                    completion(.failure(err))
-                } else {
-                    // 로컬 상태 반영
-                    DispatchQueue.main.async {
-                        self?.participatedChallenges.insert(challengeId)
-                        self?.todayParticipations.insert(challengeId)
-                    }
-                    completion(.success(()))
-                }
-            }
-        }
+    
+    private func appendParticipationDoc(uid: String,
+                                        challengeID: String,
+                                        promise: @escaping (Result<Void,Error>) -> Void) {
+        db.collection("users").document(uid)
+          .collection("participations").addDocument(data: [
+              "challengeId": challengeID,
+              "date": FieldValue.serverTimestamp()
+          ]) { [weak self] err in
+              if let err { promise(.failure(err)) }
+              else {
+                  self?.todayParticipations.insert(challengeID)
+                  promise(.success(()))
+              }
+          }
     }
 }

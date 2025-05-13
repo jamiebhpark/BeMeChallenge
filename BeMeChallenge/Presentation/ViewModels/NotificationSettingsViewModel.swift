@@ -2,50 +2,69 @@
 import Foundation
 import UserNotifications
 import UIKit
+import Combine
 
-/// Settings 화면의 “푸시 알림 받기” 토글 로직 담당
-class NotificationSettingsViewModel: ObservableObject {
-    @Published var isPushEnabled: Bool = false
-    @Published var isUpdating: Bool = false
-    @Published var errorMessage: String? = nil
-
-    init() {
-        fetchNotificationSettings()
-    }
-
-    /// 현재 시스템 알림 권한 상태 조회
-    func fetchNotificationSettings() {
+@MainActor
+final class NotificationSettingsViewModel: ObservableObject {
+    
+    /// 권한 상태 Loadable
+    @Published private(set) var state: Loadable<Bool> = .idle          // true = 허용
+    private var cancellables = Set<AnyCancellable>()
+    
+    init() { refresh() }
+    
+    /// 최신 권한 상태를 조회
+    func refresh() {
+        state = .loading
         UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
-            DispatchQueue.main.async {
-                let stat = settings.authorizationStatus
-                self?.isPushEnabled = (stat == .authorized || stat == .provisional)
+            Task { @MainActor in
+                guard let self else { return }
+                let granted = settings.authorizationStatus == .authorized ||
+                              settings.authorizationStatus == .provisional
+                self.state = .loaded(granted)
             }
         }
     }
-
-    /// 토글 on/off 처리
-    func togglePush(_ enabled: Bool) {
-        if enabled {
-            isUpdating = true
-            UNUserNotificationCenter.current()
-              .requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] granted, error in
-                DispatchQueue.main.async {
-                  self?.isUpdating = false
-                  if let e = error {
-                    self?.errorMessage = e.localizedDescription
-                    self?.isPushEnabled = false
-                  } else if granted {
-                    UIApplication.shared.registerForRemoteNotifications()
-                    self?.isPushEnabled = true
-                  } else {
-                    self?.isPushEnabled = false
-                  }
+    
+    /// 사용자가 토글을 켰을 때 처리
+    func requestPermission() {
+        state = .loading
+        UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert,.sound,.badge]) { [weak self] granted, err in
+                Task { @MainActor in
+                    if let err { self?.state = .failed(err) }
+                    else {
+                        if granted { UIApplication.shared.registerForRemoteNotifications() }
+                        self?.state = .loaded(granted)
+                    }
                 }
             }
-        } else {
-            // iOS 에서는 앱 내에서 권한 철회 불가 → 설정 앱 안내
-            errorMessage = "푸시 알림 해제는 기기 설정 → BeMe Challenge → 알림에서 가능합니다."
-            fetchNotificationSettings()
-        }
+    }
+    
+    /// 토글을 끄면 iOS 내에서 해제할 수 없으므로 안내 문구 반환
+    func disableMessage() -> String {
+        "알림 해제는 ‘설정 앱 > BeMe Challenge > 알림’ 에서 가능합니다."
+    }
+}
+// NotificationSettingsViewModel.swift 에 다음 메서드 추가 및 수정
+extension NotificationSettingsViewModel {
+    /// 콜백으로 성공 여부 전달하도록 requestPermission 수정
+    func requestPermission(completion: @escaping (Bool) -> Void) {
+        state = .loading
+        UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] granted, err in
+                Task { @MainActor in
+                    if let err {
+                        self?.state = .failed(err)
+                        completion(false)
+                    } else {
+                        if granted {
+                            UIApplication.shared.registerForRemoteNotifications()
+                        }
+                        self?.state = .loaded(granted)
+                        completion(granted)
+                    }
+                }
+            }
     }
 }

@@ -1,134 +1,124 @@
-//  CameraViewModel.swift
-//  BeMeChallenge
-
+// Presentation/ViewModels/CameraViewModel.swift
 import Foundation
 import AVFoundation
 import FirebaseStorage
 import FirebaseAuth
-import FirebaseFirestore   // ← 추가
-import UIKit   // ✅ UIImage 사용
+import FirebaseFirestore
+import Combine
+import UIKit
 
+@MainActor
 final class CameraViewModel: NSObject, ObservableObject {
     
-    // MARK: - Published
+    // MARK: Published
     @Published var capturedImage: UIImage?
+    @Published private(set) var uploadState: LoadableProgress = .idle
     
-    // MARK: - Camera Session
+    // MARK: Camera Session
     let session = AVCaptureSession()
-    private let output = AVCapturePhotoOutput()
+    private let output  = AVCapturePhotoOutput()
     
-    // Firestore 인스턴스
-    private let db = Firestore.firestore()   // ← 추가
+    // MARK: Private
+    private let db = Firestore.firestore()
+    private var cancellables = Set<AnyCancellable>()
     
-    // 세션 설정
+    // MARK: Session
     func configureSession() {
         session.beginConfiguration()
         session.sessionPreset = .photo
         
         guard
-            let device = AVCaptureDevice.default(for: .video),
-            let input  = try? AVCaptureDeviceInput(device: device),
-            session.canAddInput(input),
-            session.canAddOutput(output)
-        else {
-            session.commitConfiguration()
-            return
-        }
-        session.addInput(input)
+            let dev = AVCaptureDevice.default(for: .video),
+            let inp = try? AVCaptureDeviceInput(device: dev),
+            session.canAddInput(inp), session.canAddOutput(output)
+        else { session.commitConfiguration(); return }
+        
+        session.addInput(inp)
         session.addOutput(output)
         session.commitConfiguration()
         session.startRunning()
     }
+    func stopSession() { session.stopRunning() }
     
-    func stopSession() {
-        session.stopRunning()
-    }
-    
-    // MARK: - Capture
+    // MARK: Capture
     func capturePhoto() {
-        let settings = AVCapturePhotoSettings()
-        output.capturePhoto(with: settings, delegate: self)
+        output.capturePhoto(with: .init(), delegate: self)
     }
 }
 
 // MARK: - AVCapturePhotoCaptureDelegate
 extension CameraViewModel: AVCapturePhotoCaptureDelegate {
-    func photoOutput(_ output: AVCapturePhotoOutput,
-                     didFinishProcessingPhoto photo: AVCapturePhoto,
-                     error: Error?) {
-        guard
-            error == nil,
-            let data = photo.fileDataRepresentation(),
-            let image = UIImage(data: data)
-        else { return }
-        DispatchQueue.main.async { self.capturedImage = image }
+    nonisolated func photoOutput(_ output: AVCapturePhotoOutput,
+                                 didFinishProcessingPhoto photo: AVCapturePhoto,
+                                 error: Error?) {
+        guard   error == nil,
+                let data  = photo.fileDataRepresentation(),
+                let image = UIImage(data: data) else { return }
+        Task { @MainActor in self.capturedImage = image }
     }
 }
 
 // MARK: - Upload
 extension CameraViewModel {
-    /// 촬영한 사진을 업로드하고 Firestore의 `challengePosts` 컬렉션에 포스트 문서를 생성합니다.
-    func uploadPhoto(_ image: UIImage,
-                     forChallenge challengeId: String,
-                     completion: @escaping (Result<Void,Error>) -> Void) {
+    
+    /// 업로드를 시작하고 진행률을 `uploadState` 로 발행
+    func startUpload(forChallenge cid: String,
+                     onDone: @escaping (Bool) -> Void) {
+        guard let img = capturedImage else { return }
+        uploadState = .running(0)
+        
+        Task.detached { [weak self] in
+            guard let self else { return }
+            let result = await self.upload(image: img, challengeId: cid)
+            await MainActor.run {
+                switch result {
+                case .success:
+                    self.uploadState = .succeeded ; onDone(true)
+                case .failure(let e):
+                    self.uploadState = .failed(e) ; onDone(false)
+                }
+            }
+        }
+    }
+    
+    // MARK: async-await 업로드 핵심
+    private func upload(image: UIImage,
+                        challengeId: String) async -> Result<Void,Error> {
         guard
-            let uid = Auth.auth().currentUser?.uid
-        else {
-            completion(.failure(NSError(domain: "Upload",
-                                        code: -1,
-                                        userInfo: [NSLocalizedDescriptionKey: "로그인이 필요합니다."])))
-            return
-        }
+            let uid = Auth.auth().currentUser?.uid,
+            let data = image.resized(maxPixel: 1024).jpegData(compressionQuality: 0.8)
+        else { return .failure(simpleErr("인코딩 실패")) }
         
-        // 1) 리사이즈 후 JPEG 변환
-        let resized = image.resized(maxPixel: 1024)
-        guard let data = resized.jpegData(compressionQuality: 0.8) else {
-            completion(.failure(NSError(domain: "Upload",
-                                        code: -1,
-                                        userInfo: [NSLocalizedDescriptionKey: "이미지 인코딩 실패"])))
-            return
-        }
-        
-        // 2) Storage 경로
-        let fileName = UUID().uuidString + ".jpg"
-        let storageRef = Storage.storage()
+        let ref = Storage.storage()
             .reference()
-            .child("user_uploads/\(uid)/\(challengeId)/\(fileName)")
+            .child("user_uploads/\(uid)/\(challengeId)/\(UUID().uuidString).jpg")
         
-        // 3) 스토리지에 업로드
-        storageRef.putData(data, metadata: nil) { [weak self] _, error in
-            guard error == nil else {
-                completion(.failure(error!))
-                return
+        do {
+            let task = ref.putDataAsync(data)      // ✨ 확장 util (아래)
+            for try await progress in task {
+                await MainActor.run { self.uploadState = .running(progress) }
             }
-            // 4) 다운로드 URL 받아오기
-            storageRef.downloadURL { url, error in
-                guard let downloadURL = url, error == nil else {
-                    completion(.failure(error!))
-                    return
-                }
-                
-                // 5) Firestore에 challengePosts 문서 생성
-                guard let self = self else { return }
-                let postsRef = self.db.collection("challengePosts").document()
-                let postId = postsRef.documentID
-                let postData: [String: Any] = [
-                    "userId":       uid,
-                    "challengeId":  challengeId,
-                    "imageUrl":     downloadURL.absoluteString,
-                    "createdAt":    FieldValue.serverTimestamp(),
-                    "reactions":    [String: Int](),   // 초기 반응 딕셔너리
-                    "reported":     false
-                ]
-                
-                postsRef.setData(postData) { err in
-                    if let err = err {
-                        completion(.failure(err))
-                    } else {
-                        completion(.success(()))
-                    }
-                }
-            }
-        }
+            let url  = try await ref.downloadURL()
+            try await addPostDoc(uid: uid, cid: challengeId, imageURL: url)
+            return .success(())
+        } catch { return .failure(error) }
+    }
+    
+    private func addPostDoc(uid: String,
+                            cid: String,
+                            imageURL: URL) async throws {
+        try await db.collection("challengePosts").addDocument(data: [
+            "userId": uid,
+            "challengeId": cid,
+            "imageUrl": imageURL.absoluteString,
+            "createdAt": FieldValue.serverTimestamp(),
+            "reactions": [String:Int](),
+            "reported":  false
+        ])
+    }
+    
+    private func simpleErr(_ msg: String) -> NSError {
+        NSError(domain: "CameraUpload", code: -1,
+                userInfo: [NSLocalizedDescriptionKey: msg])
     }
 }

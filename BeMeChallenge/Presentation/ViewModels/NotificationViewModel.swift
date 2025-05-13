@@ -3,40 +3,31 @@ import Foundation
 import FirebaseFirestore
 import FirebaseAuth
 
-class NotificationViewModel: ObservableObject {
-    @Published var notifications: [AppNotification] = []
-    private var db = Firestore.firestore()
-    private var listener: ListenerRegistration?
+@MainActor
+final class NotificationViewModel: ObservableObject {
     
-    /// 현재 사용자에 해당하는 알림 데이터를 실시간으로 가져옵니다.
-    func fetchNotifications() {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+    @Published private(set) var state: Loadable<[AppNotification]> = .idle
+    private var listener: ListenerRegistration?
+    private let db = Firestore.firestore()
+    
+    func subscribe() {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        state = .loading
         listener?.remove()
         listener = db.collection("notifications")
-            .whereField("userId", isEqualTo: userId)
+            .whereField("userId", isEqualTo: uid)
             .order(by: "createdAt", descending: true)
-            .addSnapshotListener { [weak self] snapshot, error in
-                if let error = error {
-                    print("알림 조회 에러: \(error.localizedDescription)")
-                    return
-                }
-                guard let documents = snapshot?.documents else { return }
-                let fetchedNotifications: [AppNotification] = documents.compactMap { doc in
-                    do {
-                        let notification = try doc.data(as: AppNotification.self)
-                        return notification
-                    } catch {
-                        print("알림 디코딩 에러: \(error.localizedDescription)")
-                        return nil
-                    }
-                }
-                DispatchQueue.main.async {
-                    self?.notifications = fetchedNotifications
-                }
+            .addSnapshotListener { [weak self] snap, err in
+                guard let self else { return }
+                if let err { self.state = .failed(err); return }
+                do {
+                    let list = try snap?.documents.map {
+                        try $0.data(as: AppNotification.self)
+                    } ?? []
+                    self.state = .loaded(list)
+                } catch { self.state = .failed(error) }
             }
     }
     
-    deinit {
-        listener?.remove()
-    }
+    deinit { listener?.remove() }
 }
