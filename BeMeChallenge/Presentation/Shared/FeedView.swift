@@ -17,7 +17,7 @@ struct FeedView: View {
         User(id: post.userId, nickname: "익명",
              bio: nil, location: nil,
              profileImageURL: nil,
-             isProfilePublic: true, fcmToken: nil)
+             fcmToken: nil)
     }
     
     var body: some View {

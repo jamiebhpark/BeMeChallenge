@@ -1,15 +1,20 @@
-//ContentView.swift
+//
+//  ContentView.swift
+//  BeMeChallenge
+//
+
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject var authViewModel = AuthViewModel()
-    
+    // 전역에서 주입된 AuthViewModel 사용
+    @EnvironmentObject private var authViewModel: AuthViewModel
+
     var body: some View {
         Group {
             if authViewModel.isLoggedIn {
-                MainTabView() // 메인 탭 (홈, 촬영, 프로필)
+                MainTabView()               // 홈 · 프로필 탭
             } else {
-                LoginView(authViewModel: authViewModel) // 공유된 authViewModel 전달
+                LoginView()                 // 매개변수 필요 없음
             }
         }
         .onAppear {

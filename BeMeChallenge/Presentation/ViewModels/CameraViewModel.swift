@@ -107,15 +107,21 @@ extension CameraViewModel {
     private func addPostDoc(uid: String,
                             cid: String,
                             imageURL: URL) async throws {
-        try await db.collection("challengePosts").addDocument(data: [
-            "userId": uid,
-            "challengeId": cid,
-            "imageUrl": imageURL.absoluteString,
-            "createdAt": FieldValue.serverTimestamp(),
-            "reactions": [String:Int](),
-            "reported":  false
-        ])
+
+        let newPost = NewPost(
+            challengeId: cid,
+            userId: uid,
+            imageUrl: imageURL.absoluteString,
+            createdAt: Timestamp(date: Date()),
+            reactions: [:],
+            reported: false,
+            caption: nil                 // or your caption
+        )
+
+        try await db.collection("challengePosts")
+                    .addDocument(from: newPost)   // ✅ DTO에는 id 없음
     }
+
     
     private func simpleErr(_ msg: String) -> NSError {
         NSError(domain: "CameraUpload", code: -1,

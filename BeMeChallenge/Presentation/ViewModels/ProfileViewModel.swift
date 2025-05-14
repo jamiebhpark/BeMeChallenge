@@ -1,183 +1,178 @@
-// Presentation/ViewModels/ProfileViewModel.swift
+//
+//  ProfileViewModel.swift
+//  BeMeChallenge
+//
+//  개선 사항
+//  1. 로그아웃 시 Firestore 리스너 해제, 재로그인 시 재구독
+//  2. profileListener · postsListener 분리
+//  3. 공개/비공개 필드 제거 + 단순 디코딩
+//
 
 import Foundation
 import FirebaseAuth
 import FirebaseFirestore
 import FirebaseStorage
+import Combine
 import UIKit
 
+// ──────────────────────────────────────────────────────────────
 @MainActor
 final class ProfileViewModel: ObservableObject {
-    // 프로필 로딩 상태
+
+    // MARK: - Published
     @Published private(set) var profileState: Loadable<UserProfile> = .idle
-    // 내 포스트 목록
-    @Published var userPosts: [Post] = []
-    
+    @Published private(set) var userPosts: [Post] = []
+
+    // MARK: - Private
     private let db      = Firestore.firestore()
     private let storage = Storage.storage()
-    private var listener: ListenerRegistration?
-    
-    private var uid: String? { Auth.auth().currentUser?.uid }
-    
+
+    private var profileListener: ListenerRegistration?
+    private var postsListener:   ListenerRegistration?
+    private var cancellables     = Set<AnyCancellable>()
+
+    // MARK: - Init
     init() {
-        subscribeProfile()
-        listenUserPosts()
+        startListeners()
+
+        NotificationCenter.default.publisher(for: .didSignOut)
+            .sink { [weak self] _ in self?.stopListeners() }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: .didSignIn)
+            .sink { [weak self] _ in self?.startListeners() }
+            .store(in: &cancellables)
     }
-    deinit { listener?.remove() }
-    
-    /// 뷰가 appear 될 때 또는 재시도 버튼 눌렀을 때 호출
-    func refresh() {
-        subscribeProfile()
-        listenUserPosts()
-    }
-    
-    /// Firestore 에서 내 프로필 실시간 구독
-    private func subscribeProfile() {
-        guard let uid = uid else { return }
+
+    // MARK: Listener 관리 ---------------------------------------------------
+    private func startListeners() {
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+
+        // ── 프로필 ----------------------------------------------------------
         profileState = .loading
-        listener = db
-            .collection("users")
-            .document(uid)
-            .addSnapshotListener { [weak self] snap, error in
+        profileListener = db.document("users/\(uid)")
+            .addSnapshotListener { [weak self] snap, err in
                 guard let self = self else { return }
-                if let error = error {
-                    self.profileState = .failed(error)
+
+                // ① 파이어스토어 에러 → 즉시 표시
+                if let err {
+                    self.profileState = .failed(err)
                     return
                 }
-                do {
-                    let prof = try snap?.data(as: UserProfile.self)
-                    self.profileState = .loaded(prof!)
-                } catch {
-                    self.profileState = .failed(error)
+
+                // (A) 문서 자체가 없음 → Skeleton 생성 시도 후 리턴
+                guard var data = snap?.data() else {
+                    self.db.document("users/\(uid)")
+                        .setData(["nickname": "익명"], merge: true)
+                    return                                // 다음 스냅샷에서 재시도
+                }
+
+                // (B) nickname 키가 비어 있음 → 패치 후 리턴
+                if data["nickname"] == nil {
+                    self.db.document("users/\(uid)")
+                        .setData(["nickname": "익명"], merge: true)
+                    return
+                }
+
+                // (C) 디코딩
+                if let user = User(document: snap!) {
+                    self.profileState = .loaded(user)
+                } else {
+                    self.profileState = .failed(self.simpleErr("프로필 디코딩 실패"))
                 }
             }
+
+        // ── 내 포스트 -------------------------------------------------------
+        postsListener = db.collection("challengePosts")
+            .whereField("userId", isEqualTo: uid)
+            .order(by: "createdAt", descending: true)
+            .addSnapshotListener { [weak self] snap, _ in
+                self?.userPosts = snap?.documents.compactMap {
+                    try? $0.data(as: Post.self)
+                } ?? []
+            }
     }
-    
-    /// Firestore 에서 내 포스트 실시간 구독
-    private func listenUserPosts() {
-        guard let uid = uid else { return }
-        db.collection("challengePosts")
-          .whereField("userId", isEqualTo: uid)
-          .order(by: "createdAt", descending: true)
-          .addSnapshotListener { [weak self] snap, error in
-              guard let self = self else { return }
-              if error != nil { return }
-              self.userPosts = snap?.documents.compactMap { doc in
-                  try? doc.data(as: Post.self)
-              } ?? []
-          }
+
+
+    private func stopListeners() {
+        profileListener?.remove(); profileListener = nil
+        postsListener?.remove();   postsListener   = nil
+        profileState = .idle
+        userPosts.removeAll()
     }
-    
-    /// 프로필 정보 업데이트
-    /// 성공 시에는 스냅샷 리스너가 자동으로 최신 프로필을 내려주므로
-    /// 여기서는 단순히 Firestore 업데이트만 수행합니다.
-    func updateProfile(
-        nickname: String,
-        bio: String?,
-        location: String?
-    ) async -> Result<Void, Error> {
-        guard let uid = uid else {
-            return .failure(NSError(
-                domain: "Profile",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "로그인이 필요합니다"]
-            ))
+    func refresh() { stopListeners(); startListeners() }
+
+    // MARK: 프로필 정보 업데이트 --------------------------------------------
+    func updateProfile(nickname: String,
+                       bio: String?,
+                       location: String?) async -> Result<Void, Error> {
+
+        guard let uid = Auth.auth().currentUser?.uid else {
+            return .failure(simpleErr("로그인이 필요합니다"))
         }
         do {
-            try await db
-                .collection("users")
-                .document(uid)
-                .updateData([
-                    "nickname": nickname,
-                    "bio": bio as Any,
-                    "location": location as Any
-                ])
+            try await db.collection("users").document(uid).updateData([
+                "nickname": nickname,
+                "bio": bio as Any,
+                "location": location as Any
+            ])
             return .success(())
-        } catch {
-            return .failure(error)
-        }
+        } catch { return .failure(error) }
     }
-    
-    /// 프로필 사진 업로드
-    func updateProfilePicture(
-        _ image: UIImage,
-        completion: @escaping (Result<Void, Error>) -> Void
-    ) {
-        guard let uid = uid else {
-            completion(.failure(NSError(
-                domain: "Profile",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "로그인이 필요합니다"]
-            )))
-            return
-        }
-        // 1) 리사이즈 + JPEG 압축
-        let resized = image.resized(maxPixel: 1024)
-        guard let data = resized.jpegData(compressionQuality: 0.8) else {
-            completion(.failure(NSError(
-                domain: "Profile",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "이미지 인코딩 실패"]
-            )))
-            return
-        }
-        // 2) 스토리지 업로드
+
+    // MARK: 프로필 사진 ------------------------------------------------------
+    func updateProfilePicture(_ image: UIImage,
+                              completion: @escaping (Result<Void, Error>) -> Void) {
+
+        guard let uid = Auth.auth().currentUser?.uid else {
+            completion(.failure(simpleErr("로그인이 필요합니다"))); return }
+
+        guard let data = image.resized(maxPixel: 1024)
+                              .jpegData(compressionQuality: 0.8) else {
+            completion(.failure(simpleErr("이미지 인코딩 실패"))); return }
+
         let ref = storage.reference().child("profile_images/\(uid).jpg")
-        ref.putData(data, metadata: nil) { [weak self] _, error in
-            guard error == nil else {
-                completion(.failure(error!))
-                return
-            }
-            ref.downloadURL { url, error in
-                guard let dlURL = url, error == nil else {
-                    completion(.failure(error!))
-                    return
+        ref.putData(data, metadata: nil) { [weak self] _, err in
+            if let err { completion(.failure(err)); return }
+            ref.downloadURL { url, err in
+                guard let url, err == nil else { completion(.failure(err!)); return }
+                self?.db.collection("users").document(uid).updateData([
+                    "profileImageURL": url.absoluteString,
+                    "profileImageUpdatedAt": FieldValue.serverTimestamp()
+                ]) { err in
+                    completion(err == nil ? .success(()) : .failure(err!))
                 }
-                // 3) Firestore 업데이트 (serverTimestamp → Date로 디코딩)
-                self?.db.collection("users").document(uid)
-                    .updateData([
-                        "profileImageURL":       dlURL.absoluteString,
-                        "profileImageUpdatedAt": FieldValue.serverTimestamp()
-                    ]) { error in
-                        if let error = error {
-                            completion(.failure(error))
-                        } else {
-                            completion(.success(()))
-                        }
-                    }
             }
         }
     }
-    
-    /// 기본 아바타로 되돌리기
+
     func resetProfilePicture() {
-        guard let uid = uid else { return }
-        db.collection("users").document(uid)
-          .updateData([
-              "profileImageURL":       FieldValue.delete(),
-              "profileImageUpdatedAt": FieldValue.delete()
-          ])
+        guard let uid = Auth.auth().currentUser?.uid else { return }
+        db.collection("users").document(uid).updateData([
+            "profileImageURL": FieldValue.delete(),
+            "profileImageUpdatedAt": FieldValue.delete()
+        ])
     }
-    
-    /// 포스트 삭제
+
+    // MARK: 게시물 관리 -----------------------------------------------------
     func deletePost(_ post: Post) {
         guard let id = post.id else { return }
         db.collection("challengePosts").document(id).delete()
     }
-    
-    /// 포스트 신고
+
     func reportPost(_ post: Post) {
         guard let id = post.id else { return }
         ReportService.shared.reportPost(postId: id) { _ in }
     }
+
+    // MARK: Helper
+    private func simpleErr(_ msg: String) -> NSError {
+        .init(domain: "Profile", code: -1,
+              userInfo: [NSLocalizedDescriptionKey: msg])
+    }
 }
 
-/// Firestore 의 Timestamp 를 Swift Date 로 바로 디코딩합니다
-struct UserProfile: Identifiable, Codable {
-    @DocumentID var id: String?
-    let nickname: String
-    let bio: String?
-    let location: String?
-    let profileImageURL: String?
-    let profileImageUpdatedAt: Date?
-}
+// ------------------------------------------------------------------------
+// UserProfile = User  (타입 별칭, 모델은 Domain/Models/User.swift 정의)
+// ------------------------------------------------------------------------
+public typealias UserProfile = User

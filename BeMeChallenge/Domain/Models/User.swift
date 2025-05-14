@@ -1,86 +1,85 @@
-// Domain/Models/User.swift
+//
+//  User.swift
+//  BeMeChallenge
+//
+
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
 
 public struct User: Identifiable, Codable {
-    public let id: String
+    // 필수
+    @DocumentID public var id: String?
     public let nickname: String
-    public let bio: String?
-    public let location: String?
-    public let profileImageURL: String?
-    public let profileImageUpdatedAt: TimeInterval?
-    public let isProfilePublic: Bool
-    public let fcmToken: String?
 
+    // 선택(Nullable) 필드 – @ExplicitNull 로 NSNull 크래시 방지
+    @ExplicitNull public var bio: String?
+    @ExplicitNull public var location: String?
+    @ExplicitNull public var profileImageURL: String?
+    @ExplicitNull public var profileImageUpdatedAt: TimeInterval?
+    @ExplicitNull public var fcmToken: String?
+
+    // ------------------------------------------------------------------
     // 1) DocumentSnapshot → User
+    // ------------------------------------------------------------------
     public init?(document: DocumentSnapshot) {
-        let data = document.data() ?? [:]
-        guard
-            let nickname = data["nickname"] as? String,
-            let isPublic = data["isProfilePublic"] as? Bool
-        else {
-            return nil
-        }
+        guard let d = document.data(),
+              let nickname = d["nickname"] as? String else { return nil }
+
         self.id = document.documentID
         self.nickname = nickname
-        self.bio = data["bio"] as? String
-        self.location = data["location"] as? String
-        self.profileImageURL = data["profileImageURL"] as? String
-        if let ts = data["profileImageUpdatedAt"] as? Timestamp {
-            self.profileImageUpdatedAt = ts.dateValue().timeIntervalSince1970
+        self._bio = .init(wrappedValue: d["bio"] as? String)
+        self._location = .init(wrappedValue: d["location"] as? String)
+        self._profileImageURL = .init(wrappedValue: d["profileImageURL"] as? String)
+        if let ts = d["profileImageUpdatedAt"] as? Timestamp {
+            self._profileImageUpdatedAt = .init(wrappedValue: ts.dateValue().timeIntervalSince1970)
         } else {
-            self.profileImageUpdatedAt = nil
+            self._profileImageUpdatedAt = .init(wrappedValue: nil)
         }
-        self.isProfilePublic = isPublic
-        self.fcmToken = data["fcmToken"] as? String
+        self._fcmToken = .init(wrappedValue: d["fcmToken"] as? String)
     }
 
+    // ------------------------------------------------------------------
     // 2) QueryDocumentSnapshot → User
+    // ------------------------------------------------------------------
     public init?(document: QueryDocumentSnapshot) {
-        let data = document.data()
-        guard
-            let nickname = data["nickname"] as? String,
-            let isPublic = data["isProfilePublic"] as? Bool
-        else {
-            return nil
-        }
+        let d = document.data()
+        guard let nickname = d["nickname"] as? String else { return nil }
+
         self.id = document.documentID
         self.nickname = nickname
-        self.bio = data["bio"] as? String
-        self.location = data["location"] as? String
-        self.profileImageURL = data["profileImageURL"] as? String
-        if let ts = data["profileImageUpdatedAt"] as? Timestamp {
-            self.profileImageUpdatedAt = ts.dateValue().timeIntervalSince1970
+        self._bio = .init(wrappedValue: d["bio"] as? String)
+        self._location = .init(wrappedValue: d["location"] as? String)
+        self._profileImageURL = .init(wrappedValue: d["profileImageURL"] as? String)
+        if let ts = d["profileImageUpdatedAt"] as? Timestamp {
+            self._profileImageUpdatedAt = .init(wrappedValue: ts.dateValue().timeIntervalSince1970)
         } else {
-            self.profileImageUpdatedAt = nil
+            self._profileImageUpdatedAt = .init(wrappedValue: nil)
         }
-        self.isProfilePublic = isPublic
-        self.fcmToken = data["fcmToken"] as? String
+        self._fcmToken = .init(wrappedValue: d["fcmToken"] as? String)
     }
 
+    // ------------------------------------------------------------------
     // 3) 직접 생성용 멤버와이즈 이니셜라이저
-    public init(
-        id: String,
-        nickname: String,
-        bio: String?,
-        location: String?,
-        profileImageURL: String?,
-        profileImageUpdatedAt: TimeInterval? = nil,
-        isProfilePublic: Bool,
-        fcmToken: String?
-    ) {
+    // ------------------------------------------------------------------
+    public init(id: String,
+                nickname: String,
+                bio: String? = nil,
+                location: String? = nil,
+                profileImageURL: String? = nil,
+                profileImageUpdatedAt: TimeInterval? = nil,
+                fcmToken: String? = nil) {
+
         self.id = id
         self.nickname = nickname
-        self.bio = bio
-        self.location = location
-        self.profileImageURL = profileImageURL
-        self.profileImageUpdatedAt = profileImageUpdatedAt
-        self.isProfilePublic = isProfilePublic
-        self.fcmToken = fcmToken
+        self._bio = .init(wrappedValue: bio)
+        self._location = .init(wrappedValue: location)
+        self._profileImageURL = .init(wrappedValue: profileImageURL)
+        self._profileImageUpdatedAt = .init(wrappedValue: profileImageUpdatedAt)
+        self._fcmToken = .init(wrappedValue: fcmToken)
     }
 
-    /// 캐시 무시용 버전 쿼리를 붙여서 URL 생성
+    // 캐시-버스터 쿼리를 붙인 이미지 URL
     public var effectiveProfileImageURL: URL? {
         guard let base = profileImageURL else { return nil }
         if let v = profileImageUpdatedAt {
@@ -91,17 +90,17 @@ public struct User: Identifiable, Codable {
     }
 }
 
-// ⚠️ struct 바깥, 파일 최상단에 선언
+// ----------------------------------------------------------------------
+// FirebaseAuth.User → User (임시 변환용)
+// ----------------------------------------------------------------------
 extension User {
-    /// FirebaseAuth.User → 도메인 User 변환
-    init(from firebaseUser: FirebaseAuth.User) {
-        self.id = firebaseUser.uid
-        self.nickname = firebaseUser.displayName ?? "User"
-        self.bio = nil
-        self.location = nil
-        self.profileImageURL = firebaseUser.photoURL?.absoluteString
-        self.profileImageUpdatedAt = nil
-        self.isProfilePublic = true
-        self.fcmToken = nil
+    init(from fb: FirebaseAuth.User) {
+        self.id = fb.uid
+        self.nickname = fb.displayName ?? "User"
+        self._bio = .init(wrappedValue: nil)
+        self._location = .init(wrappedValue: nil)
+        self._profileImageURL = .init(wrappedValue: fb.photoURL?.absoluteString)
+        self._profileImageUpdatedAt = .init(wrappedValue: nil)
+        self._fcmToken = .init(wrappedValue: nil)
     }
 }

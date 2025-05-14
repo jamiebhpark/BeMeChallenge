@@ -12,18 +12,12 @@ struct ProfilePictureUpdateView: View {
     @State private var uploadError: String?
 
     // Loadable<UserProfile>에서 꺼내기
+    /// 프로필 아바타 URL (캐시‐버스터 포함)
     private var avatarURL: URL? {
-        guard case .loaded(let prof) = vm.profileState,
-              let base = prof.profileImageURL
-        else { return nil }
-        if let date = prof.profileImageUpdatedAt {
-            // Date → TimeInterval → Int
-            let timestamp = Int(date.timeIntervalSince1970)
-            let sep = base.contains("?") ? "&" : "?"
-            return URL(string: "\(base)\(sep)v=\(timestamp)")
-        }
-        return URL(string: base)
+        guard case .loaded(let prof) = vm.profileState else { return nil }
+        return prof.effectiveProfileImageURL        // ← 한 줄로 끝
     }
+
 
     var body: some View {
         VStack(spacing: 24) {

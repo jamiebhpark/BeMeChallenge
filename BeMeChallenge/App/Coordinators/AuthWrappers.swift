@@ -6,7 +6,7 @@ import SwiftUI
 struct LoginViewWrapper: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     var body: some View {
-        LoginView(authViewModel: authViewModel)      // ← 시그니처 맞춤
+        LoginView()          // 추가 파라미터 필요 없음
     }
 }
 

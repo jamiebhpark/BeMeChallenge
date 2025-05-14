@@ -18,7 +18,6 @@ final class UserMiniVM: ObservableObject {
                 bio: nil,
                 location: nil,
                 profileImageURL: d["profileImageURL"] as? String,
-                isProfilePublic: true,
                 fcmToken: nil
             )
             Task { @MainActor in self.user = u }

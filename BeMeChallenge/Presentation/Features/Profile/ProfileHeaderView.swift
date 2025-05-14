@@ -13,14 +13,9 @@ struct ProfileHeaderView<Content: View>: View {
     }
 
     private var avatarURL: URL? {
-        guard let base = profile.profileImageURL else { return nil }
-        if let date = profile.profileImageUpdatedAt {
-            let ts = Int(date.timeIntervalSince1970)
-            let sep = base.contains("?") ? "&" : "?"
-            return URL(string: "\(base)\(sep)v=\(ts)")
-        }
-        return URL(string: base)
+        profile.effectiveProfileImageURL
     }
+
 
     var body: some View {
         ZStack {
